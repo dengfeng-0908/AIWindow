@@ -1,0 +1,94 @@
+# AI 视窗
+
+<img src="apps/ios/AIWindow/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="128" alt="AI 视窗 App 图标">
+
+AI 视窗（工程名 `AIWindow`）是一款面向 iPhone 的开源 AI 资讯与社区浏览工具。它把 AI HOT 的公开资讯接口、LINUX DO 站内搜索以及本地收藏和浏览记录放在一个 SwiftUI App 中。
+
+> AI 视窗是独立开发的非官方客户端，与 AI HOT 和 LINUX DO 无隶属、合作或认可关系。
+
+## 功能
+
+- AI HOT 精选、热点和最新日报，支持时间窗口、分类、搜索、刷新和 cursor 分页
+- 资讯详情中的 AI HOT 署名、canonical 入口、第三方原文入口和系统分享
+- Bing / Google 的 LINUX DO 站内搜索，以及用户主动操作的 `WKWebView` 浏览与网页登录
+- LINUX DO 浏览历史、收藏、标签、备注和 JSON 备份恢复，数据保存在本机
+- LINUX DO 登录状态在 App 沙盒中保持，并可在设置中清除此 App 的会话
+- 无自建账号、无广告、无分析 SDK、无项目后端，也不需要 API Key
+
+Chatbot 和 App 后端尚未开发。
+
+## 第三方服务边界
+
+AI HOT 明确允许个人项目和独立产品客户端使用匿名只读接口。公开展示数据时，本项目保留 AI HOT 署名与 canonical 链接；同一完整 URL 至少间隔 60 秒才会再次请求，过期缓存使用条件请求，收到 `Retry-After` 时继续退避。详见 [AI HOT 公开接入条款](https://aihot.virxact.com/terms)。
+
+LINUX DO 的访问仅由用户通过搜索引擎、系统浏览器或 `WKWebView` 发起。用户可以在网页内自行登录，但项目不自动登录、签到、发帖、点赞或读取通知，也不爬取、后台监控、镜像或批量再分发论坛帖子和图片。详见 [LINUX DO 服务条款](https://linux.do/tos)。
+
+第三方名称、商标、接口数据、帖子、图片和链接文章不属于本仓库的 MIT 授权范围。完整声明见 [NOTICE.md](NOTICE.md)。
+
+## 环境与构建
+
+- macOS 与 Xcode 26 或兼容版本
+- iOS 17 或更高版本的 iPhone / Simulator
+
+无需签名的模拟器构建：
+
+```sh
+cd apps/ios
+xcodebuild \
+  -project AIWindow.xcodeproj \
+  -scheme AIWindow \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+测试前先用以下命令查看本机已安装的 Simulator，再把目标名称填入测试命令：
+
+```sh
+xcodebuild -project AIWindow.xcodeproj -scheme AIWindow -showdestinations
+xcodebuild \
+  -project AIWindow.xcodeproj \
+  -scheme AIWindow \
+  -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=<Simulator Name>' \
+  test
+```
+
+真机签名和安装见 [apps/ios/README.md](apps/ios/README.md)。项目不会提交任何开发者的 Apple Team 值。
+
+## 隐私
+
+SwiftData 数据库存放在 App 沙盒中。导出的 JSON 包含帖子链接、标题、时间、收藏、标签、备注和搜索记录，不包含网页正文、Cookie 或账号凭据。
+
+Bing 和 Google 使用临时网页会话。`linux.do` 顶层页面使用 App 专属的持久网页存储，以便用户重启后保持登录；Cookie 仍留在 App 沙盒，代码不会读取、记录或导出它们。设置中的“清除此 App 的登录状态”会清空该持久网页存储，不撤销其他设备的会话，也不影响 Safari。
+
+AI HOT 内容当前只保留在运行内存中；App 不发送设备标识符、Apple 账号信息或 API Key。
+
+## 项目结构
+
+```text
+AIWindow/
+├── apps/ios/                 iPhone App 与测试
+├── docs/                     架构和资产来源说明
+├── scripts/                  图标重建与公开发布审计
+├── AGENTS.md                 贡献与验证约束
+├── LICENSE                   MIT License
+├── NOTICE.md                 第三方权利与非官方声明
+└── SECURITY.md               安全问题报告方式
+```
+
+## 开源审计
+
+提交前从仓库根目录运行：
+
+```sh
+./scripts/public_release_audit.sh
+git diff --check
+```
+
+审计脚本会检查签名字段、本机路径、常见凭据和设备标识符、本地 Xcode 状态、未审阅媒体以及公开文件完整性。它不能替代人工代码审查或法律意见。
+
+## License
+
+项目自有代码和素材使用 [MIT License](LICENSE)。第三方服务与内容边界见 [NOTICE.md](NOTICE.md)。

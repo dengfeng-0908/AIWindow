@@ -1,0 +1,23 @@
+.DS_Store
+
+# Xcode user and build output
+DerivedData/
+build/
+*.xcresult
+*.xcuserstate
+xcuserdata/
+*.xcarchive
+*.ipa
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.p8
+*.pem
+*.key
+*.cer
+*.der
+
+# Local secrets
+.env
+.env.*
+!.env.example
