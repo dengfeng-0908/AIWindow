@@ -7,11 +7,18 @@ import WebKit
 enum BrowserSessionPolicy: Equatable {
     case ephemeralSearch
     case persistentLinuxDO
+    case ephemeralExternal
 
     static func policy(for initialURL: URL) -> Self {
         if TopicURLNormalizer.isAllowedInAppURL(initialURL),
            TopicURLNormalizer.isLinuxDOURL(initialURL) {
             return .persistentLinuxDO
+        }
+        if TopicURLNormalizer.isAllowedInAppURL(initialURL) {
+            return .ephemeralSearch
+        }
+        if TopicURLNormalizer.isSafeEphemeralInAppURL(initialURL) {
+            return .ephemeralExternal
         }
         return .ephemeralSearch
     }
@@ -21,9 +28,16 @@ enum BrowserSessionPolicy: Equatable {
     }
 
     func shouldRouteToPersistentSession(_ url: URL) -> Bool {
-        self == .ephemeralSearch
+        self != .persistentLinuxDO
             && TopicURLNormalizer.isAllowedInAppURL(url)
             && TopicURLNormalizer.isLinuxDOURL(url)
+    }
+
+    func shouldRouteToIsolatedSession(_ url: URL) -> Bool {
+        self != .ephemeralExternal
+            && TopicURLNormalizer.isSafeEphemeralInAppURL(url)
+            && !TopicURLNormalizer.isLinuxDOURL(url)
+            && !allowsTopLevelNavigation(to: url)
     }
 
     func allowsTopLevelNavigation(to url: URL) -> Bool {
@@ -34,6 +48,9 @@ enum BrowserSessionPolicy: Equatable {
         case .persistentLinuxDO:
             return TopicURLNormalizer.isAllowedInAppURL(url)
                 && TopicURLNormalizer.isLinuxDOURL(url)
+        case .ephemeralExternal:
+            return TopicURLNormalizer.isSafeEphemeralInAppURL(url)
+                && !TopicURLNormalizer.isLinuxDOURL(url)
         }
     }
 }
@@ -64,7 +81,9 @@ final class BrowserViewModel: NSObject, ObservableObject {
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false
     @Published private(set) var isCurrentTopicFavorite = false
-    @Published private(set) var pendingPersistentURL: URL?
+    @Published private(set) var pendingInAppURL: URL?
+    @Published private(set) var isPreparingAnalysis = false
+    @Published private(set) var analysisContext: TopicAnalysisContext?
     @Published var errorMessage: String?
 
     let webView: WKWebView
@@ -75,6 +94,9 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var hasLoadedInitialURL = false
     private var lastRecordedCanonicalURL: String?
     private var currentTopic: TopicRecord?
+    private var urlObservation: NSKeyValueObservation?
+    private var titleObservation: NSKeyValueObservation?
+    private var observedNavigationTask: Task<Void, Never>?
 
     init(initialURL: URL, modelContext: ModelContext) {
         self.initialURL = initialURL
@@ -92,12 +114,28 @@ final class BrowserViewModel: NSObject, ObservableObject {
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
+        urlObservation = webView.observe(\.url, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.handleObservedNavigationChange()
+            }
+        }
+        titleObservation = webView.observe(\.title, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.updatePageTitle()
+            }
+        }
+    }
+
+    deinit {
+        observedNavigationTask?.cancel()
+        urlObservation?.invalidate()
+        titleObservation?.invalidate()
     }
 
     func loadInitialURLIfNeeded() {
         guard !hasLoadedInitialURL else { return }
         hasLoadedInitialURL = true
-        guard TopicURLNormalizer.isAllowedInAppURL(initialURL) else {
+        guard sessionPolicy.allowsTopLevelNavigation(to: initialURL) else {
             errorMessage = "该地址不能在 App 内打开。"
             return
         }
@@ -118,8 +156,12 @@ final class BrowserViewModel: NSObject, ObservableObject {
         webView.reload()
     }
 
-    func clearPendingPersistentNavigation() {
-        pendingPersistentURL = nil
+    func clearPendingInAppNavigation() {
+        pendingInAppURL = nil
+    }
+
+    func clearAnalysisContext() {
+        analysisContext = nil
     }
 
     func reloadAfterWebsiteDataClear() {
@@ -141,6 +183,43 @@ final class BrowserViewModel: NSObject, ObservableObject {
         UIPasteboard.general.url = currentURL
     }
 
+    var canAnalyzeCurrentTopic: Bool {
+        guard let currentURL else { return false }
+        return TopicURLNormalizer.canonicalTopicURL(from: currentURL) != nil
+    }
+
+    func prepareCurrentTopicAnalysis() {
+        guard !isPreparingAnalysis,
+              let currentURL,
+              let canonicalURL = TopicURLNormalizer.canonicalTopicURL(from: currentURL)
+        else {
+            return
+        }
+
+        isPreparingAnalysis = true
+        errorMessage = nil
+        Task { [weak self] in
+            guard let self else { return }
+            defer { isPreparingAnalysis = false }
+            do {
+                let rawValue = try await webView.evaluateJavaScript(Self.topicExtractionScript)
+                guard let json = rawValue as? String,
+                      let data = json.data(using: .utf8)
+                else {
+                    throw TopicAnalysisContextError.noReadableContent
+                }
+                let snapshot = try JSONDecoder().decode(ForumPageSnapshot.self, from: data)
+                analysisContext = try TopicAnalysisContextBuilder.make(
+                    title: snapshot.title,
+                    canonicalURL: canonicalURL,
+                    candidates: snapshot.posts
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     func toggleFavorite() {
         guard let topic = currentTopic else { return }
         do {
@@ -155,6 +234,28 @@ final class BrowserViewModel: NSObject, ObservableObject {
         currentURL = webView.url
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
+    }
+
+    private func updatePageTitle() {
+        pageTitle = webView.title?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty ?? "浏览"
+    }
+
+    private func handleObservedNavigationChange() {
+        updateNavigationState()
+        observedNavigationTask?.cancel()
+        observedNavigationTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 350_000_000)
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled else { return }
+            updatePageTitle()
+            updateNavigationState()
+            recordCurrentTopicIfNeeded()
+        }
     }
 
     private func recordCurrentTopicIfNeeded() {
@@ -187,6 +288,42 @@ final class BrowserViewModel: NSObject, ObservableObject {
             errorMessage = "无法保存浏览记录：\(error.localizedDescription)"
         }
     }
+
+    private static let topicExtractionScript = #"""
+    (() => {
+        const normalize = (value) => String(value || "")
+            .replace(/\u00a0/g, " ")
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+        const articles = Array.from(document.querySelectorAll("article[data-post-id]"));
+        const nodes = articles.length > 0
+            ? articles
+            : Array.from(document.querySelectorAll(".topic-post"));
+        const viewportCenter = window.innerHeight / 2;
+        const posts = nodes.slice(0, 100).map((node, index) => {
+            const body = node.querySelector(".cooked, [itemprop='articleBody']");
+            const numberedNode = node.hasAttribute("data-post-number")
+                ? node
+                : node.querySelector("[data-post-number]");
+            const parsedOrder = Number.parseInt(
+                numberedNode ? numberedNode.getAttribute("data-post-number") : "",
+                10
+            );
+            const rect = node.getBoundingClientRect();
+            return {
+                order: Number.isFinite(parsedOrder) ? parsedOrder : index + 1,
+                text: normalize(body ? body.innerText : "").slice(0, 12000),
+                distanceFromViewport: Math.abs(rect.top + rect.height / 2 - viewportCenter)
+            };
+        }).filter((post) => post.text.length > 0);
+        const titleNode = document.querySelector("#topic-title h1, .fancy-title, h1");
+        return JSON.stringify({
+            title: normalize(titleNode ? titleNode.innerText : document.title).slice(0, 500),
+            posts
+        });
+    })();
+    """#
 }
 
 extension BrowserViewModel: WKNavigationDelegate {
@@ -216,15 +353,19 @@ extension BrowserViewModel: WKNavigationDelegate {
 
         if isMainFrame {
             if sessionPolicy.shouldRouteToPersistentSession(url) {
-                pendingPersistentURL = url
+                pendingInAppURL = url
+                decisionHandler(.cancel)
+                return
+            }
+
+            if sessionPolicy.shouldRouteToIsolatedSession(url) {
+                pendingInAppURL = url
                 decisionHandler(.cancel)
                 return
             }
 
             guard sessionPolicy.allowsTopLevelNavigation(to: url) else {
-                if TopicURLNormalizer.isSafeExternalURL(url) {
-                    UIApplication.shared.open(url)
-                }
+                errorMessage = "该链接不能在 App 内安全打开。"
                 decisionHandler(.cancel)
                 return
             }
@@ -241,7 +382,7 @@ extension BrowserViewModel: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
         isLoading = false
-        pageTitle = webView.title?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? "浏览"
+        updatePageTitle()
         updateNavigationState()
         recordCurrentTopicIfNeeded()
     }
@@ -285,11 +426,13 @@ extension BrowserViewModel: WKUIDelegate {
         }
 
         if sessionPolicy.shouldRouteToPersistentSession(url) {
-            pendingPersistentURL = url
+            pendingInAppURL = url
+        } else if sessionPolicy.shouldRouteToIsolatedSession(url) {
+            pendingInAppURL = url
         } else if sessionPolicy.allowsTopLevelNavigation(to: url) {
             webView.load(URLRequest(url: url))
-        } else if TopicURLNormalizer.isSafeExternalURL(url) {
-            UIApplication.shared.open(url)
+        } else {
+            errorMessage = "该链接不能在 App 内安全打开。"
         }
         return nil
     }

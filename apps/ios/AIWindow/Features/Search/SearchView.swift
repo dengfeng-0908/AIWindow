@@ -55,13 +55,6 @@ struct SearchView: View {
                     NavigationLink(value: linuxDOHomeURL) {
                         Label("打开 LINUX DO（可登录）", systemImage: "person.crop.circle")
                     }
-
-                    Text(
-                        "登录由 LINUX DO 网页处理，状态仅保存在本 App 沙盒；"
-                        + "App 不读取或导出密码、验证码与 Cookie。"
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
                 }
 
                 Section {

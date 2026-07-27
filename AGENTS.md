@@ -3,8 +3,9 @@
 ## Scope
 
 AIWindow is an iOS 17+ SwiftUI app. The current repository contains the AI HOT
-news client and user-driven LINUX DO search/browser flows. A chatbot and app
-backend do not exist and must not be implied by documentation or UI.
+news client, user-driven LINUX DO search/browser flows, and optional analysis
+through a model API configured by the user. A chatbot and app backend do not
+exist and must not be implied by documentation or UI.
 
 Read `README.md`, `docs/architecture.md`, and `apps/ios/README.md` before making
 behavioral changes.
@@ -19,7 +20,16 @@ behavioral changes.
   iframe embedding, or redistribution of forum posts and images.
 - Keep search-engine web data ephemeral. Persistent WebKit data is reserved for
   user-driven `linux.do` top-level pages, must remain clearable in Settings, and
-  must never be inspected, logged, exported, or included in backups.
+  its cookies, caches, credentials, and local storage must never be inspected,
+  logged, exported, or included in backups.
+- Model analysis must start from an explicit user action. It may send only text
+  currently rendered on the open `linux.do/t/...` page plus the user's question;
+  do not auto-load unseen replies, retain extracted source text, or send private
+  messages, account pages, cookies, hidden DOM, or other browsing history.
+- Store a user-provided model key only in the device Keychain. Model requests
+  must use a non-persistent session, HTTPS, bounded request/response content,
+  and no cross-origin redirects. Never log prompts, responses, or authorization
+  headers.
 - Do not commit API keys, Apple Team identifiers, signing material, device
   identifiers, cookies, personal data, absolute local paths, or email addresses.
 - Keep `DEVELOPMENT_TEAM` out of `project.pbxproj`; each developer selects a

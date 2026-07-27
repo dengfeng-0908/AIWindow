@@ -11,6 +11,8 @@ Please use the repository's private security-advisory form under the GitHub
 **Security** tab. Do not open a public issue containing credentials, personal
 data, device identifiers, or exploit details.
 
-The app does not require an API key. Reports should use synthetic data and must
-not include Apple account credentials, signing identities, cookies, or exported
-personal browsing data.
+The news and browsing features do not require an API key. Optional model
+analysis uses a key supplied by the user and stored in the device Keychain.
+Reports should use synthetic data and must not include real model keys, Apple
+account credentials, signing identities, cookies, prompts, responses, or
+exported personal browsing data.

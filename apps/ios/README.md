@@ -1,6 +1,6 @@
 # AI 视窗 for iOS
 
-AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站内搜索和本地收藏能力。它是非官方独立客户端；Chatbot 和 App 后端尚未加入。
+AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站内搜索、本地收藏和用户自带模型的帖子分析。它是非官方独立客户端；Chatbot 和 App 后端尚未加入。
 
 ## 当前功能
 
@@ -10,8 +10,9 @@ AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站
 - 搜索引擎临时会话与 LINUX DO 主站持久登录会话
 - 网页内自行登录、跨重启保持登录，以及设置页清除此 App 的会话
 - LINUX DO 帖子浏览历史、收藏、标签、备注和检索
+- 一键整理当前已加载帖子文字并发送到用户配置的 Chat Completions API
 - JSON 导入、导出、格式校验和去重合并
-- 无自建账号、无后端、无广告、无分析 SDK、无 API Key
+- 无自建账号、无后端、无广告、无行为统计 SDK；核心浏览功能无需 API Key
 
 ## 环境
 
@@ -31,6 +32,12 @@ AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站
 仓库有意不保存 `DEVELOPMENT_TEAM`。选择 Team 后，Xcode 可能修改 `project.pbxproj`；不要把个人 Team 值、签名证书、描述文件或设备标识符提交到 Git。提交前运行根目录的 `scripts/public_release_audit.sh`。
 
 个人团队签名可能存在有效期限制，具体以当前 Xcode 和 Apple Account 提示为准。
+
+## 配置帖子分析
+
+在 App 的“设置 → AI 分析”中填写完整的 OpenAI-compatible Chat Completions HTTPS 地址、模型名称和自己的 API Key。项目不预置模型服务或共享密钥；API Key 只存入当前设备的 Keychain，可在同一页面一次清除全部模型设置。
+
+打开一个 LINUX DO 主题后，点击底部的星光按钮即可自动整理当前已经加载的主帖和附近回复。第一次向某个模型域名发送时会显示目标域名和实际范围；之后不要求手动选择帖子文字。该功能不会自动滚动、加载整帖或分析私信和账号页面。
 
 ## 命令行验证
 
@@ -65,8 +72,10 @@ SwiftData 数据库存放在 App 沙盒中。导出的 JSON 包含帖子链接�
 
 AI HOT 通过 `https://aihot.virxact.com/api/v1` 匿名读取，不发送账号、Cookie、设备标识符或 API Key。响应只缓存在运行内存中；相同完整 URL 在 60 秒内不会重复请求，过期后使用条件请求，并遵守服务端 `Retry-After`。
 
-LINUX DO 页面只由用户主动打开。Bing 和 Google 结果页使用临时 WebKit 数据存储；`linux.do` 顶层页面使用 App 沙盒中的持久数据存储，方便网页登录跨重启保持。搜索结果进入主站时会自动切换会话，其他 HTTP/HTTPS 链接交给 iOS 默认浏览器。
+LINUX DO 页面只由用户主动打开。Bing 和 Google 结果页使用临时 WebKit 数据存储；`linux.do` 顶层页面使用 App 沙盒中的持久数据存储，方便网页登录跨重启保持。搜索结果进入主站时会自动切换会话，第三方 HTTPS 链接在独立的临时 App 内网页中打开，不接触 LINUX DO 的持久登录会话。
 
 App 不读取、记录或导出 Cookie、密码与验证码，也不判断具体账号身份。设置页的“清除此 App 的登录状态”会清空 App 的持久 WebKit 数据，不撤销其他设备的会话，也不影响 Safari。项目不自动登录、签到、发帖、点赞、读取通知，也不对论坛执行爬取、后台监控或批量内容提取。
+
+模型分析只在用户点击后读取当前页面已渲染的帖子正文，并与用户问题一起从 iPhone 直接发送到所配置的模型服务。请求不包含 Cookie、密码、验证码、其他浏览记录或未加载回复，也不经过 AIWindow 后端。模型端点和模型名保存在普通本地设置中；API Key 在 Keychain 中；提示、帖子正文和结果都不进入 SwiftData 或 JSON 备份。
 
 服务条款和第三方权利边界见仓库根目录的 `NOTICE.md`。

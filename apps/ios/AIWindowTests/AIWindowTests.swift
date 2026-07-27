@@ -170,6 +170,277 @@ final class AIWindowTests: XCTestCase {
         )
     }
 
+    func testExternalHTTPSLinksUseIsolatedInAppSession() {
+        let externalURL = URL(string: "https://example.com/article")!
+
+        XCTAssertEqual(
+            BrowserSessionPolicy.policy(for: externalURL),
+            .ephemeralExternal
+        )
+        XCTAssertTrue(
+            BrowserSessionPolicy.persistentLinuxDO.shouldRouteToIsolatedSession(externalURL)
+        )
+        XCTAssertTrue(
+            BrowserSessionPolicy.ephemeralSearch.shouldRouteToIsolatedSession(externalURL)
+        )
+        XCTAssertTrue(
+            BrowserSessionPolicy.ephemeralExternal.allowsTopLevelNavigation(to: externalURL)
+        )
+        XCTAssertTrue(
+            BrowserSessionPolicy.ephemeralExternal.shouldRouteToPersistentSession(
+                URL(string: "https://linux.do/t/example/123")!
+            )
+        )
+    }
+
+    func testEphemeralInAppLinksRequireSafeHTTPSURL() {
+        XCTAssertTrue(
+            TopicURLNormalizer.isSafeEphemeralInAppURL(
+                URL(string: "https://example.com/article")!
+            )
+        )
+        XCTAssertFalse(
+            TopicURLNormalizer.isSafeEphemeralInAppURL(
+                URL(string: "http://example.com/article")!
+            )
+        )
+        XCTAssertFalse(
+            TopicURLNormalizer.isSafeEphemeralInAppURL(
+                credentialBearingURL(host: "example.com", path: "/article")
+            )
+        )
+        XCTAssertFalse(
+            TopicURLNormalizer.isSafeEphemeralInAppURL(
+                URL(string: "https://example.com:444/article")!
+            )
+        )
+    }
+
+    func testModelConfigurationRequiresCompleteSafeHTTPSURLAndModel() throws {
+        let configuration = try ModelAPIConfiguration(
+            endpointText: "https://model.example.com/v1/chat/completions",
+            modelText: "example-model"
+        )
+
+        XCTAssertEqual(configuration.providerHost, "model.example.com")
+        XCTAssertEqual(configuration.model, "example-model")
+
+        var credentialedEndpoint = URLComponents()
+        credentialedEndpoint.scheme = "https"
+        credentialedEndpoint.user = "placeholder-user"
+        credentialedEndpoint.password = "placeholder-value"
+        credentialedEndpoint.host = "model.example.com"
+        credentialedEndpoint.path = "/v1/chat/completions"
+
+        for endpoint in [
+            "http://model.example.com/v1/chat/completions",
+            credentialedEndpoint.string!,
+            "https://model.example.com/v1/chat/completions?key=value",
+            "https://model.example.com/v1/chat/completions#fragment",
+            "https://model.example.com/",
+        ] {
+            XCTAssertThrowsError(
+                try ModelAPIConfiguration(endpointText: endpoint, modelText: "example-model")
+            )
+        }
+
+        XCTAssertThrowsError(
+            try ModelAPIConfiguration(
+                endpointText: "https://model.example.com/v1/chat/completions",
+                modelText: "  "
+            )
+        )
+    }
+
+    func testModelConfigurationStorePersistsOnlyEndpointAndModel() throws {
+        let suiteName = "AIWindowTests.ModelConfigurationStore"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let saved = try ModelConfigurationStore.save(
+            endpointText: "https://model.example.com/v1/chat/completions",
+            modelText: "example-model",
+            defaults: defaults
+        )
+        let loaded = try XCTUnwrap(ModelConfigurationStore.load(defaults: defaults))
+
+        XCTAssertEqual(loaded, saved)
+        XCTAssertEqual(ModelConfigurationStore.savedValues(defaults: defaults).model, "example-model")
+
+        ModelConfigurationStore.clear(defaults: defaults)
+        XCTAssertNil(ModelConfigurationStore.load(defaults: defaults))
+    }
+
+    func testAnalysisConsentIsScopedToProviderHost() throws {
+        let suiteName = "AIWindowTests.ModelAnalysisConsent"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertFalse(
+            ModelAnalysisConsentStore.hasAcknowledged(
+                host: "model.example.com",
+                defaults: defaults
+            )
+        )
+        ModelAnalysisConsentStore.acknowledge(
+            host: "model.example.com",
+            defaults: defaults
+        )
+        XCTAssertTrue(
+            ModelAnalysisConsentStore.hasAcknowledged(
+                host: "model.example.com",
+                defaults: defaults
+            )
+        )
+        XCTAssertFalse(
+            ModelAnalysisConsentStore.hasAcknowledged(
+                host: "another.example.com",
+                defaults: defaults
+            )
+        )
+        ModelAnalysisConsentStore.clear(defaults: defaults)
+        XCTAssertFalse(
+            ModelAnalysisConsentStore.hasAcknowledged(
+                host: "model.example.com",
+                defaults: defaults
+            )
+        )
+    }
+
+    func testAnalysisContextKeepsMainPostAndNearbyLoadedRepliesWithinBudget() throws {
+        var candidates = [
+            ForumPostCandidate(
+                order: 1,
+                text: "  主帖内容  \n\n\n第二段  ",
+                distanceFromViewport: 10_000
+            ),
+        ]
+        candidates.append(contentsOf: (2...30).map { order in
+            ForumPostCandidate(
+                order: order,
+                text: "回复 \(order)",
+                distanceFromViewport: Double(order)
+            )
+        })
+
+        let context = try TopicAnalysisContextBuilder.make(
+            title: " 示例主题 ",
+            canonicalURL: URL(string: "https://linux.do/t/example/123")!,
+            candidates: candidates
+        )
+
+        XCTAssertEqual(context.posts.first?.order, 1)
+        XCTAssertEqual(context.posts.first?.text, "主帖内容\n\n第二段")
+        XCTAssertEqual(context.posts.count, TopicAnalysisContextBuilder.maximumPostCount)
+        XCTAssertTrue(context.wasTruncated)
+        XCTAssertLessThanOrEqual(
+            context.characterCount,
+            TopicAnalysisContextBuilder.maximumContextCharacters
+        )
+        XCTAssertTrue(context.posts.contains(where: { $0.order == 2 }))
+        XCTAssertFalse(context.posts.contains(where: { $0.order == 30 }))
+    }
+
+    func testAnalysisContextRejectsPageWithoutReadablePosts() {
+        XCTAssertThrowsError(
+            try TopicAnalysisContextBuilder.make(
+                title: "Empty",
+                canonicalURL: URL(string: "https://linux.do/t/example/123")!,
+                candidates: [
+                    ForumPostCandidate(order: 1, text: "   ", distanceFromViewport: 0),
+                ]
+            )
+        ) { error in
+            guard case TopicAnalysisContextError.noReadableContent = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
+    func testAnalysisContextDoesNotClaimMissingMainPostWasLoaded() throws {
+        let context = try TopicAnalysisContextBuilder.make(
+            title: "部分主题",
+            canonicalURL: URL(string: "https://linux.do/t/example/123")!,
+            candidates: [
+                ForumPostCandidate(order: 8, text: "当前回复", distanceFromViewport: 0),
+            ]
+        )
+
+        XCTAssertFalse(context.includesMainPost)
+        XCTAssertTrue(context.scopeDescription.contains("当前已加载的 1 段"))
+        XCTAssertFalse(context.scopeDescription.contains("主帖"))
+    }
+
+    func testModelRequestContainsQuestionAndUntrustedForumBoundary() throws {
+        let configuration = try ModelAPIConfiguration(
+            endpointText: "https://model.example.com/v1/chat/completions",
+            modelText: "example-model"
+        )
+        let context = try TopicAnalysisContextBuilder.make(
+            title: "示例主题",
+            canonicalURL: URL(string: "https://linux.do/t/example/123")!,
+            candidates: [
+                ForumPostCandidate(
+                    order: 1,
+                    text: "这是一段帖子正文。",
+                    distanceFromViewport: 0
+                ),
+            ]
+        )
+        let request = try ModelAnalysisClient(
+            configuration: configuration,
+            apiKey: "key"
+        ).makeRequest(context: context, question: "争论焦点是什么？")
+        let body = try XCTUnwrap(request.httpBody)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+        let messages = try XCTUnwrap(object["messages"] as? [[String: Any]])
+        let userMessage = try XCTUnwrap(messages.last?["content"] as? String)
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer key")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+        XCTAssertEqual(object["model"] as? String, "example-model")
+        XCTAssertTrue(userMessage.contains("争论焦点是什么？"))
+        XCTAssertTrue(userMessage.contains("<forum_content>"))
+        XCTAssertTrue(userMessage.contains("这是一段帖子正文。"))
+    }
+
+    func testModelResponseSupportsTextAndTextParts() throws {
+        let plain = Data(
+            #"{"choices":[{"message":{"content":"分析结果"}}]}"#.utf8
+        )
+        let parts = Data(
+            #"{"choices":[{"message":{"content":[{"type":"text","text":"第一段"},{"type":"text","text":"第二段"}]}}]}"#.utf8
+        )
+
+        XCTAssertEqual(try ModelAnalysisClient.parseResponse(plain), "分析结果")
+        XCTAssertEqual(try ModelAnalysisClient.parseResponse(parts), "第一段第二段")
+    }
+
+    func testModelResponseRejectsUnreasonablyLargeRenderedText() throws {
+        let object: [String: Any] = [
+            "choices": [
+                ["message": [
+                    "content": String(
+                        repeating: "x",
+                        count: ModelAnalysisClient.maximumResultCharacters + 1
+                    ),
+                ]],
+            ],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: object)
+
+        XCTAssertThrowsError(try ModelAnalysisClient.parseResponse(data)) { error in
+            guard case ModelAnalysisError.responseTooLarge = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testSearchURLUsesSiteRestrictionAndSelectedEngine() {
         let url = SearchEngine.bing.searchURL(for: "Swift 数据库")!
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)

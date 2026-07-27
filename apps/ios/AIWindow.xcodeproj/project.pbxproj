@@ -32,6 +32,8 @@
 		B00000000000000000000017 /* AIHotViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000019 /* AIHotViewModel.swift */; };
 		B00000000000000000000018 /* AIHotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* AIHotView.swift */; };
 		B00000000000000000000019 /* AIHotDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001B /* AIHotDetailView.swift */; };
+		B0000000000000000000001A /* ModelAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001C /* ModelAnalysisService.swift */; };
+		B0000000000000000000001B /* TopicAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001D /* TopicAnalysisView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +74,8 @@
 		A00000000000000000000019 /* AIHotViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHotViewModel.swift; sourceTree = "<group>"; };
 		A0000000000000000000001A /* AIHotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHotView.swift; sourceTree = "<group>"; };
 		A0000000000000000000001B /* AIHotDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHotDetailView.swift; sourceTree = "<group>"; };
+		A0000000000000000000001C /* ModelAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelAnalysisService.swift; sourceTree = "<group>"; };
+		A0000000000000000000001D /* TopicAnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopicAnalysisView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -141,6 +145,7 @@
 				A00000000000000000000007 /* TopicRepository.swift */,
 				A00000000000000000000008 /* BackupService.swift */,
 				A00000000000000000000018 /* AIHotClient.swift */,
+				A0000000000000000000001C /* ModelAnalysisService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -173,6 +178,7 @@
 				A0000000000000000000000B /* BrowserViewModel.swift */,
 				A0000000000000000000000C /* BrowserWebView.swift */,
 				A0000000000000000000000D /* BrowserView.swift */,
+				A0000000000000000000001D /* TopicAnalysisView.swift */,
 			);
 			path = Browser;
 			sourceTree = "<group>";
@@ -360,6 +366,8 @@
 				B00000000000000000000017 /* AIHotViewModel.swift in Sources */,
 				B00000000000000000000018 /* AIHotView.swift in Sources */,
 				B00000000000000000000019 /* AIHotDetailView.swift in Sources */,
+				B0000000000000000000001A /* ModelAnalysisService.swift in Sources */,
+				B0000000000000000000001B /* TopicAnalysisView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

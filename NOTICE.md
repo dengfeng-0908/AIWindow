@@ -15,6 +15,12 @@ Use of either service remains subject to its current terms:
 - AI HOT public access terms: <https://aihot.virxact.com/terms>
 - LINUX DO terms of service: <https://linux.do/tos>
 
+Any model endpoint configured by a user is also an independent third-party
+service. AIWindow does not bundle, operate, endorse, or receive traffic through
+a model provider. A user-triggered analysis sends the displayed scope directly
+from the device to that provider and remains subject to the provider's terms,
+privacy policy, and usage charges.
+
 The app icon was created specifically for this project from the reproducible
 geometry in `scripts/render_app_icon.swift`. It contains no third-party logo or
 brand asset.

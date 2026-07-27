@@ -13,8 +13,14 @@ struct SettingsView: View {
     @State private var showsClearConfirmation = false
     @State private var showsWebsiteDataClearConfirmation = false
     @State private var isClearingWebsiteData = false
+    @State private var modelEndpoint = ""
+    @State private var modelName = ""
+    @State private var apiKeyInput = ""
+    @State private var hasStoredAPIKey = false
     @State private var statusTitle = ""
     @State private var statusMessage: String?
+
+    private let apiKeyStore = KeychainModelAPIKeyStore()
 
     var body: some View {
         NavigationStack {
@@ -34,37 +40,41 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("隐私") {
-                    Label("帖子、收藏与备注只保存在本机", systemImage: "iphone")
-                    Label("搜索引擎使用临时网页会话", systemImage: "hand.raised")
-                    Label("LINUX DO 登录状态保存在 App 沙盒", systemImage: "person.badge.key")
-                    Label("不包含广告、分析或账号 SDK", systemImage: "checkmark.shield")
+                Section("AI 分析") {
+                    TextField("完整 API 地址", text: $modelEndpoint)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+
+                    TextField("模型名称", text: $modelName)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    SecureField(
+                        hasStoredAPIKey ? "输入新 API Key 以替换" : "API Key",
+                        text: $apiKeyInput
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                    Button(action: saveModelSettings) {
+                        Label("保存模型设置", systemImage: "checkmark.circle")
+                    }
+
+                    if hasStoredAPIKey || !modelEndpoint.isEmpty || !modelName.isEmpty {
+                        Button(role: .destructive, action: clearModelSettings) {
+                            Label("清除模型设置", systemImage: "key.slash")
+                        }
+                    }
                 }
 
                 Section("LINUX DO 登录") {
-                    Text("不会读取或导出 Cookie、密码和验证码，也不会影响 Safari 的登录状态。")
-
                     Button(role: .destructive) {
                         showsWebsiteDataClearConfirmation = true
                     } label: {
                         Label("清除此 App 的登录状态", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                     .disabled(isClearingWebsiteData)
-                }
-
-                Section("关于") {
-                    Text(
-                        "AI 视窗是独立开发的非官方客户端，"
-                        + "与 AI HOT 和 LINUX DO 无隶属、合作或认可关系。"
-                    )
-
-                    Link(destination: URL(string: "https://aihot.virxact.com/terms")!) {
-                        Label("AI HOT 公开接入条款", systemImage: "doc.text")
-                    }
-
-                    Link(destination: URL(string: "https://linux.do/tos")!) {
-                        Label("LINUX DO 服务条款", systemImage: "doc.text")
-                    }
                 }
 
                 Section {
@@ -77,6 +87,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("设置")
+            .onAppear(perform: loadModelSettings)
             .fileExporter(
                 isPresented: $isExporting,
                 document: exportDocument,
@@ -106,7 +117,7 @@ struct SettingsView: View {
                 Button("取消", role: .cancel) {}
             }
             .confirmationDialog(
-                "清除此 App 保存的 LINUX DO Cookie、缓存和其他网页登录数据？这不会撤销其他设备的会话，也不会影响 Safari。",
+                "将退出本 App 中的 LINUX DO 登录，是否继续？",
                 isPresented: $showsWebsiteDataClearConfirmation,
                 titleVisibility: .visible
             ) {
@@ -188,8 +199,59 @@ struct SettingsView: View {
             isClearingWebsiteData = false
             showStatus(
                 title: "已清除",
-                message: "此 App 的 LINUX DO 登录状态和持久网页数据已清除。"
+                message: "已退出本 App 中的 LINUX DO 登录。"
             )
+        }
+    }
+
+    private func loadModelSettings() {
+        let values = ModelConfigurationStore.savedValues()
+        modelEndpoint = values.endpoint
+        modelName = values.model
+        do {
+            hasStoredAPIKey = try apiKeyStore.read() != nil
+        } catch {
+            showStatus(title: "读取失败", message: error.localizedDescription)
+        }
+    }
+
+    private func saveModelSettings() {
+        do {
+            _ = try ModelAPIConfiguration(
+                endpointText: modelEndpoint,
+                modelText: modelName
+            )
+            let trimmedKey = apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard hasStoredAPIKey || !trimmedKey.isEmpty else {
+                throw ModelAPIKeyStoreError.emptyKey
+            }
+            if !trimmedKey.isEmpty {
+                try apiKeyStore.save(trimmedKey)
+                hasStoredAPIKey = true
+                apiKeyInput = ""
+            }
+            _ = try ModelConfigurationStore.save(
+                endpointText: modelEndpoint,
+                modelText: modelName
+            )
+            showStatus(title: "已保存", message: "模型设置已保存。")
+        } catch {
+            showStatus(title: "保存失败", message: error.localizedDescription)
+        }
+    }
+
+    private func clearModelSettings() {
+        do {
+            try apiKeyStore.delete()
+            ModelConfigurationStore.clear()
+            ModelAnalysisConsentStore.clear()
+            hasStoredAPIKey = false
+            modelEndpoint = ""
+            modelName = ""
+            apiKeyInput = ""
+            showStatus(title: "已清除", message: "模型设置已清除。")
+        } catch {
+            showStatus(title: "清除失败", message: error.localizedDescription)
         }
     }
 

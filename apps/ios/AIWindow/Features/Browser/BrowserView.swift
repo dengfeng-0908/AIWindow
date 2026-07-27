@@ -35,10 +35,13 @@ private struct BrowserScreen: View {
             .navigationTitle(viewModel.pageTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .tabBar)
-            .navigationDestination(isPresented: persistentNavigationBinding) {
-                if let url = viewModel.pendingPersistentURL {
+            .navigationDestination(isPresented: inAppNavigationBinding) {
+                if let url = viewModel.pendingInAppURL {
                     BrowserView(initialURL: url)
                 }
+            }
+            .sheet(item: analysisContextBinding) { context in
+                TopicAnalysisView(context: context)
             }
             .onReceive(
                 NotificationCenter.default.publisher(
@@ -67,6 +70,16 @@ private struct BrowserScreen: View {
                     .accessibilityLabel("刷新")
 
                     Spacer()
+
+                    Button(action: viewModel.prepareCurrentTopicAnalysis) {
+                        if viewModel.isPreparingAnalysis {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                    }
+                    .disabled(!viewModel.canAnalyzeCurrentTopic || viewModel.isPreparingAnalysis)
+                    .accessibilityLabel("分析当前帖子")
 
                     Button(action: viewModel.toggleFavorite) {
                         Image(systemName: viewModel.isCurrentTopicFavorite ? "star.fill" : "star")
@@ -104,10 +117,17 @@ private struct BrowserScreen: View {
         )
     }
 
-    private var persistentNavigationBinding: Binding<Bool> {
+    private var inAppNavigationBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.pendingPersistentURL != nil },
-            set: { if !$0 { viewModel.clearPendingPersistentNavigation() } }
+            get: { viewModel.pendingInAppURL != nil },
+            set: { if !$0 { viewModel.clearPendingInAppNavigation() } }
+        )
+    }
+
+    private var analysisContextBinding: Binding<TopicAnalysisContext?> {
+        Binding(
+            get: { viewModel.analysisContext },
+            set: { if $0 == nil { viewModel.clearAnalysisContext() } }
         )
     }
 }

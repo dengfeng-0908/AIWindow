@@ -55,6 +55,15 @@ enum TopicURLNormalizer {
             && isAllowedInAppHost(url)
     }
 
+    static func isSafeEphemeralInAppURL(_ url: URL) -> Bool {
+        let scheme = url.scheme?.lowercased()
+        return scheme == "https"
+            && url.host?.isEmpty == false
+            && url.user == nil
+            && url.password == nil
+            && (url.port == nil || url.port == defaultPort(for: scheme))
+    }
+
     static func isSafeExternalURL(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
         switch scheme {

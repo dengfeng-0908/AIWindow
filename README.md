@@ -2,7 +2,7 @@
 
 <img src="apps/ios/AIWindow/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="128" alt="AI 视窗 App 图标">
 
-AI 视窗（工程名 `AIWindow`）是一款面向 iPhone 的开源 AI 资讯与社区浏览工具。它把 AI HOT 的公开资讯接口、LINUX DO 站内搜索以及本地收藏和浏览记录放在一个 SwiftUI App 中。
+AI 视窗（工程名 `AIWindow`）是一款面向 iPhone 的开源 AI 资讯与社区浏览工具。它把 AI HOT 的公开资讯接口、LINUX DO 站内搜索、本地收藏和用户自带模型的帖子分析放在一个 SwiftUI App 中。
 
 > AI 视窗是独立开发的非官方客户端，与 AI HOT 和 LINUX DO 无隶属、合作或认可关系。
 
@@ -13,15 +13,16 @@ AI 视窗（工程名 `AIWindow`）是一款面向 iPhone 的开源 AI 资讯与
 - Bing / Google 的 LINUX DO 站内搜索，以及用户主动操作的 `WKWebView` 浏览与网页登录
 - LINUX DO 浏览历史、收藏、标签、备注和 JSON 备份恢复，数据保存在本机
 - LINUX DO 登录状态在 App 沙盒中保持，并可在设置中清除此 App 的会话
-- 无自建账号、无广告、无分析 SDK、无项目后端，也不需要 API Key
+- 用户可配置 OpenAI-compatible Chat Completions API，一键分析当前已加载的帖子文字
+- 无自建账号、无广告、无行为统计 SDK、无项目后端；资讯和浏览功能不需要 API Key
 
-Chatbot 和 App 后端尚未开发。
+当前模型能力是用户主动触发的单次帖子分析，不是 Chatbot；App 后端尚未开发。
 
 ## 第三方服务边界
 
 AI HOT 明确允许个人项目和独立产品客户端使用匿名只读接口。公开展示数据时，本项目保留 AI HOT 署名与 canonical 链接；同一完整 URL 至少间隔 60 秒才会再次请求，过期缓存使用条件请求，收到 `Retry-After` 时继续退避。详见 [AI HOT 公开接入条款](https://aihot.virxact.com/terms)。
 
-LINUX DO 的访问仅由用户通过搜索引擎、系统浏览器或 `WKWebView` 发起。用户可以在网页内自行登录，但项目不自动登录、签到、发帖、点赞或读取通知，也不爬取、后台监控、镜像或批量再分发论坛帖子和图片。详见 [LINUX DO 服务条款](https://linux.do/tos)。
+LINUX DO 的访问仅由用户通过搜索引擎、系统浏览器或 `WKWebView` 发起。用户可以在网页内自行登录，但项目不自动登录、签到、发帖、点赞或读取通知，也不爬取、后台监控、镜像或批量再分发论坛帖子和图片。只有在用户点击“分析当前帖子”后，App 才会提取当前页面已经加载的正文文字并发送到用户自己配置的模型服务；不会自动加载未浏览回复。详见 [LINUX DO 服务条款](https://linux.do/tos)。
 
 第三方名称、商标、接口数据、帖子、图片和链接文章不属于本仓库的 MIT 授权范围。完整声明见 [NOTICE.md](NOTICE.md)。
 
@@ -63,7 +64,9 @@ SwiftData 数据库存放在 App 沙盒中。导出的 JSON 包含帖子链接�
 
 Bing 和 Google 使用临时网页会话。`linux.do` 顶层页面使用 App 专属的持久网页存储，以便用户重启后保持登录；Cookie 仍留在 App 沙盒，代码不会读取、记录或导出它们。设置中的“清除此 App 的登录状态”会清空该持久网页存储，不撤销其他设备的会话，也不影响 Safari。
 
-AI HOT 内容当前只保留在运行内存中；App 不发送设备标识符、Apple 账号信息或 API Key。
+模型 API 地址和模型名保存在普通本地设置中，用户提供的 API Key 只进入当前设备的 Keychain，不进入 SwiftData、JSON 备份或 Git。首次向某个模型域名分析时，App 会显示实际发送范围；请求由 iPhone 直接发往该服务，不经过 AIWindow 服务器。发送内容仅含当前已加载的帖子文字、标题、canonical URL 和用户问题，不含 Cookie、密码、验证码或其他浏览记录。分析结果只在当前界面内存中显示。
+
+AI HOT 内容当前只保留在运行内存中；App 不发送设备标识符或 Apple 账号信息。
 
 ## 项目结构
 
