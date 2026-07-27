@@ -10,7 +10,8 @@
 
 ```text
 AI HOT：   iPhone App -> AI HOT `/api/v1` 匿名只读接口
-LINUX DO：iPhone App -> 临时搜索会话 -> 用户驱动的持久主站 WKWebView
+LINUX DO：iPhone App -> 用户驱动的持久主站 WKWebView（含官方搜索页）
+备用搜索：iPhone App -> Bing / Google 临时网页会话 -> 用户选择的页面
 模型分析：当前帖子 WKWebView -> 本机上下文整理 -> 用户配置的模型 API
 本地数据：iPhone App -> SwiftData / 用户选择的 JSON 备份文件
 ```
@@ -28,8 +29,9 @@ LINUX DO：iPhone App -> 临时搜索会话 -> 用户驱动的持久主站 WKWeb
 
 ### LINUX DO
 
-- 搜索由 Bing 或 Google 的 `site:` 查询完成，不调用或模拟 LINUX DO 搜索接口。
-- Bing 和 Google 结果页使用非持久 `WKWebsiteDataStore`。用户选择 `linux.do` 结果时，App 新开一个使用默认持久数据存储的主站 `WKWebView`，因此登录状态可跨重启保留。
+- 默认搜索将用户输入编码为 `https://linux.do/search?q=...`，并在主站持久 `WKWebView` 中打开，因此结果保留 LINUX DO 自己的网页样式、排序和筛选，也能复用 App 内登录状态。App 不抓取或解析结果，不调用或模拟论坛 API。
+- Bing 和 Google 的 `site:` 查询仅作为用户明确选择的备用入口，其结果页使用非持久 `WKWebsiteDataStore`。用户从备用结果选择 `linux.do` 页面时，App 新开主站持久会话。
+- LINUX DO 搜索返回未授权、限流、服务器错误或异常 JSON 时，App 取消展示原始错误正文并给出可操作提示；不因此重试、绕过限制或检查账号状态。
 - 持久会话只允许 `linux.do` 作为顶层页面；搜索引擎和第三方站点不会进入该持久会话。第三方 HTTPS 链接使用独立的临时 App 内网页会话，用户仍可从菜单明确选择默认浏览器。
 - 用户只能在网页内自行登录和操作。App 不读取 Cookie、密码、验证码或账号状态，不自动登录、签到、发帖、点赞或抓取通知。
 - 设置页可清空 App 的全部持久 WebKit 数据并通知已打开的 LINUX DO 页面重新加载。该存储只供 LINUX DO 主站会话使用，清除不会影响 Safari。

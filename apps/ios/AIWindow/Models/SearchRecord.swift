@@ -21,6 +21,6 @@ final class SearchRecord {
     }
 
     var engine: SearchEngine {
-        SearchEngine(rawValue: engineRawValue) ?? .bing
+        SearchEngine(rawValue: engineRawValue) ?? .linuxDO
     }
 }

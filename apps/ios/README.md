@@ -6,8 +6,8 @@ AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站
 
 - AI HOT 精选、热点、最新日报、分类、搜索、刷新和分页
 - AI HOT 署名、canonical 入口、第三方原文入口和系统分享
-- Bing / Google 的 LINUX DO 站内搜索入口
-- 搜索引擎临时会话与 LINUX DO 主站持久登录会话
+- 保留网页原样的 LINUX DO 官方搜索页，以及 Bing / Google 临时备用入口
+- LINUX DO 官方搜索与主站共享持久登录会话；外部搜索使用临时会话
 - 网页内自行登录、跨重启保持登录，以及设置页清除此 App 的会话
 - LINUX DO 帖子浏览历史、收藏、标签、备注和检索
 - 一键整理当前已加载帖子文字并发送到用户配置的 Chat Completions API
@@ -72,7 +72,7 @@ SwiftData 数据库存放在 App 沙盒中。导出的 JSON 包含帖子链接�
 
 AI HOT 通过 `https://aihot.virxact.com/api/v1` 匿名读取，不发送账号、Cookie、设备标识符或 API Key。响应只缓存在运行内存中；相同完整 URL 在 60 秒内不会重复请求，过期后使用条件请求，并遵守服务端 `Retry-After`。
 
-LINUX DO 页面只由用户主动打开。Bing 和 Google 结果页使用临时 WebKit 数据存储；`linux.do` 顶层页面使用 App 沙盒中的持久数据存储，方便网页登录跨重启保持。搜索结果进入主站时会自动切换会话，第三方 HTTPS 链接在独立的临时 App 内网页中打开，不接触 LINUX DO 的持久登录会话。
+LINUX DO 页面只由用户主动打开。默认搜索直接进入 `linux.do/search` 官方网页，保留站点自己的结果样式、排序和筛选，并与其他 `linux.do` 顶层页面共用 App 沙盒中的持久 WebKit 数据存储。App 不抓取、解析或重分发搜索结果，也不调用或模拟论坛 API。Bing 和 Google 仅作为备用入口，其结果页使用临时数据存储；从备用结果进入主站时会自动切换到持久会话。第三方 HTTPS 链接在独立的临时 App 内网页中打开，不接触 LINUX DO 的登录会话。
 
 App 不读取、记录或导出 Cookie、密码与验证码，也不判断具体账号身份。设置页的“清除此 App 的登录状态”会清空 App 的持久 WebKit 数据，不撤销其他设备的会话，也不影响 Safari。项目不自动登录、签到、发帖、点赞、读取通知，也不对论坛执行爬取、后台监控或批量内容提取。
 

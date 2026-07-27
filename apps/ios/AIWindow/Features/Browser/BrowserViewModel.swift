@@ -73,6 +73,37 @@ enum BrowserWebsiteDataController {
     }
 }
 
+enum BrowserNavigationResponsePolicy {
+    static func linuxDOSearchErrorMessage(
+        for url: URL,
+        statusCode: Int,
+        mimeType: String?
+    ) -> String? {
+        let normalizedPath = url.path
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+        guard TopicURLNormalizer.isLinuxDOURL(url), normalizedPath == "search" else {
+            return nil
+        }
+
+        switch statusCode {
+        case 401, 403:
+            return "LINUX DO 当前未允许此会话访问搜索。请先打开站内首页完成登录，或返回使用外部搜索。"
+        case 429:
+            return "LINUX DO 搜索请求过于频繁，请稍后再试，或返回使用外部搜索。"
+        case 400...599:
+            return "LINUX DO 搜索暂时不可用，请稍后再试，或返回使用外部搜索。"
+        default:
+            let normalizedMIMEType = mimeType?
+                .lowercased()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return normalizedMIMEType == "application/json"
+                ? "LINUX DO 搜索暂时不可用，请稍后再试，或返回使用外部搜索。"
+                : nil
+        }
+    }
+}
+
 @MainActor
 final class BrowserViewModel: NSObject, ObservableObject {
     @Published private(set) var currentURL: URL?
@@ -327,6 +358,29 @@ final class BrowserViewModel: NSObject, ObservableObject {
 }
 
 extension BrowserViewModel: WKNavigationDelegate {
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
+        guard navigationResponse.isForMainFrame,
+              let response = navigationResponse.response as? HTTPURLResponse,
+              let url = response.url,
+              let message = BrowserNavigationResponsePolicy.linuxDOSearchErrorMessage(
+                  for: url,
+                  statusCode: response.statusCode,
+                  mimeType: response.mimeType
+              )
+        else {
+            decisionHandler(.allow)
+            return
+        }
+
+        isLoading = false
+        errorMessage = message
+        decisionHandler(.cancel)
+    }
+
     func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,

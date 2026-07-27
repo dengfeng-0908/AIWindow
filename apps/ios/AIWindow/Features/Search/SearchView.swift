@@ -22,7 +22,7 @@ struct SearchView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .submitLabel(.search)
-                            .onSubmit(performSearch)
+                            .onSubmit(performPrimarySearch)
 
                         if !viewModel.query.isEmpty {
                             Button {
@@ -36,24 +36,43 @@ struct SearchView: View {
                         }
                     }
 
-                    Picker("搜索引擎", selection: $viewModel.engine) {
-                        ForEach(SearchEngine.allCases) { engine in
-                            Text(engine.displayName).tag(engine)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Button(action: performSearch) {
-                        Label("搜索公开帖子", systemImage: "arrow.right.circle.fill")
+                    Button(action: performPrimarySearch) {
+                        Label("在 LINUX DO 搜索", systemImage: "magnifyingglass.circle.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(viewModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Label("结果、排序和筛选由 LINUX DO 官方页面提供", systemImage: "globe")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Menu {
+                        Button {
+                            performSearch(using: .bing)
+                        } label: {
+                            Label("使用 Bing", systemImage: "safari")
+                        }
+
+                        Button {
+                            performSearch(using: .google)
+                        } label: {
+                            Label("使用 Google", systemImage: "safari")
+                        }
+                    } label: {
+                        Label("外部搜索备用入口", systemImage: "ellipsis.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(viewModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
 
-                Section("LINUX DO 账号") {
+                Section("站内入口") {
+                    NavigationLink(value: linuxDOSearchURL) {
+                        Label("打开完整搜索页", systemImage: "slider.horizontal.3")
+                    }
+
                     NavigationLink(value: linuxDOHomeURL) {
-                        Label("打开 LINUX DO（可登录）", systemImage: "person.crop.circle")
+                        Label("打开 LINUX DO 首页", systemImage: "house")
                     }
                 }
 
@@ -123,6 +142,19 @@ struct SearchView: View {
 
     private var linuxDOHomeURL: URL {
         URL(string: "https://linux.do/")!
+    }
+
+    private var linuxDOSearchURL: URL {
+        URL(string: "https://linux.do/search")!
+    }
+
+    private func performPrimarySearch() {
+        performSearch(using: .linuxDO)
+    }
+
+    private func performSearch(using engine: SearchEngine) {
+        viewModel.engine = engine
+        performSearch()
     }
 
     private func performSearch() {

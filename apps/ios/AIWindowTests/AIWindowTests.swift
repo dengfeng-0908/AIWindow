@@ -101,10 +101,16 @@ final class AIWindowTests: XCTestCase {
         )
     }
 
-    func testLinuxDOPagesUsePersistentSessionWhileSearchPagesRemainEphemeral() {
+    func testLinuxDOPagesUsePersistentSessionWhileExternalSearchPagesRemainEphemeral() {
         XCTAssertEqual(
             BrowserSessionPolicy.policy(
                 for: URL(string: "https://linux.do/t/example/123")!
+            ),
+            .persistentLinuxDO
+        )
+        XCTAssertEqual(
+            BrowserSessionPolicy.policy(
+                for: URL(string: "https://linux.do/search?q=SwiftData")!
             ),
             .persistentLinuxDO
         )
@@ -189,6 +195,39 @@ final class AIWindowTests: XCTestCase {
         XCTAssertTrue(
             BrowserSessionPolicy.ephemeralExternal.shouldRouteToPersistentSession(
                 URL(string: "https://linux.do/t/example/123")!
+            )
+        )
+    }
+
+    func testLinuxDOSearchResponseErrorsBecomeActionableMessages() {
+        let searchURL = URL(string: "https://linux.do/search?q=SwiftData")!
+
+        XCTAssertNotNil(
+            BrowserNavigationResponsePolicy.linuxDOSearchErrorMessage(
+                for: searchURL,
+                statusCode: 403,
+                mimeType: "text/html"
+            )
+        )
+        XCTAssertNotNil(
+            BrowserNavigationResponsePolicy.linuxDOSearchErrorMessage(
+                for: searchURL,
+                statusCode: 429,
+                mimeType: "application/json"
+            )
+        )
+        XCTAssertNotNil(
+            BrowserNavigationResponsePolicy.linuxDOSearchErrorMessage(
+                for: searchURL,
+                statusCode: 200,
+                mimeType: "application/json"
+            )
+        )
+        XCTAssertNil(
+            BrowserNavigationResponsePolicy.linuxDOSearchErrorMessage(
+                for: URL(string: "https://linux.do/t/example/123")!,
+                statusCode: 403,
+                mimeType: "text/html"
             )
         )
     }
@@ -441,7 +480,18 @@ final class AIWindowTests: XCTestCase {
         }
     }
 
-    func testSearchURLUsesSiteRestrictionAndSelectedEngine() {
+    func testOfficialSearchURLUsesLinuxDOSearchPage() {
+        let url = SearchEngine.linuxDO.searchURL(for: "Swift 数据库")!
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let query = components?.queryItems?.first(where: { $0.name == "q" })?.value
+
+        XCTAssertEqual(url.host, "linux.do")
+        XCTAssertEqual(url.path, "/search")
+        XCTAssertEqual(query, "Swift 数据库")
+        XCTAssertEqual(BrowserSessionPolicy.policy(for: url), .persistentLinuxDO)
+    }
+
+    func testExternalSearchFallbackUsesSiteRestrictionAndSelectedEngine() {
         let url = SearchEngine.bing.searchURL(for: "Swift 数据库")!
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let query = components?.queryItems?.first(where: { $0.name == "q" })?.value
@@ -455,7 +505,7 @@ final class AIWindowTests: XCTestCase {
         let context = container.mainContext
         let viewModel = SearchViewModel()
         viewModel.query = "SwiftData"
-        viewModel.engine = .bing
+        XCTAssertEqual(viewModel.engine, .linuxDO)
         XCTAssertNotNil(viewModel.makeSearchURL(in: context))
 
         viewModel.query = "SwiftData"

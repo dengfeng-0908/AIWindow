@@ -4,7 +4,7 @@ import SwiftData
 @MainActor
 final class SearchViewModel: ObservableObject {
     @Published var query = ""
-    @Published var engine: SearchEngine = .bing
+    @Published var engine: SearchEngine = .linuxDO
     @Published var errorMessage: String?
 
     func makeSearchURL(in context: ModelContext) -> URL? {
