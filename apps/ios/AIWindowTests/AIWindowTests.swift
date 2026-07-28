@@ -321,7 +321,37 @@ final class AIWindowTests: XCTestCase {
         )
     }
 
-    func testModelConfigurationStorePersistsOnlyEndpointAndModel() throws {
+    func testOfficialModelPresetsResolveExpectedEndpointsAndDefaults() throws {
+        let kimi = try ModelAPIConfiguration(
+            selection: ModelConfigurationSelection(provider: .kimi)
+        )
+        let deepSeek = try ModelAPIConfiguration(
+            selection: ModelConfigurationSelection(provider: .deepSeek)
+        )
+        let glm = try ModelAPIConfiguration(
+            selection: ModelConfigurationSelection(provider: .glm)
+        )
+        let openAI = try ModelAPIConfiguration(
+            selection: ModelConfigurationSelection(provider: .openAI)
+        )
+
+        XCTAssertEqual(kimi.endpoint.absoluteString, "https://api.moonshot.cn/v1/chat/completions")
+        XCTAssertEqual(kimi.model, "kimi-k3")
+        XCTAssertEqual(
+            deepSeek.endpoint.absoluteString,
+            "https://api.deepseek.com/chat/completions"
+        )
+        XCTAssertEqual(deepSeek.model, "deepseek-v4-flash")
+        XCTAssertEqual(
+            glm.endpoint.absoluteString,
+            "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        )
+        XCTAssertEqual(glm.model, "glm-5.2")
+        XCTAssertEqual(openAI.endpoint.absoluteString, "https://api.openai.com/v1/chat/completions")
+        XCTAssertEqual(openAI.model, "gpt-5.6-terra")
+    }
+
+    func testModelConfigurationStorePersistsCustomConfiguration() throws {
         let suiteName = "AIWindowTests.ModelConfigurationStore"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
@@ -336,9 +366,55 @@ final class AIWindowTests: XCTestCase {
 
         XCTAssertEqual(loaded, saved)
         XCTAssertEqual(ModelConfigurationStore.savedValues(defaults: defaults).model, "example-model")
+        XCTAssertEqual(
+            ModelConfigurationStore.savedSelection(defaults: defaults).provider,
+            .custom
+        )
 
         ModelConfigurationStore.clear(defaults: defaults)
         XCTAssertNil(ModelConfigurationStore.load(defaults: defaults))
+    }
+
+    func testModelConfigurationStorePersistsPresetSelection() throws {
+        let suiteName = "AIWindowTests.ModelConfigurationPresetStore"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let selection = ModelConfigurationSelection(
+            provider: .openAI,
+            modelID: "gpt-5.6-sol",
+            reasoningID: "xhigh"
+        )
+        let saved = try ModelConfigurationStore.save(
+            selection: selection,
+            defaults: defaults
+        )
+
+        XCTAssertEqual(ModelConfigurationStore.savedSelection(defaults: defaults), selection)
+        XCTAssertEqual(ModelConfigurationStore.load(defaults: defaults), saved)
+    }
+
+    func testLegacyModelConfigurationMigratesToCustomSelection() throws {
+        let suiteName = "AIWindowTests.LegacyModelConfiguration"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(
+            "https://legacy.example.com/v1/chat/completions",
+            forKey: "modelAnalysis.endpoint"
+        )
+        defaults.set("legacy-model", forKey: "modelAnalysis.model")
+
+        let selection = ModelConfigurationStore.savedSelection(defaults: defaults)
+        let configuration = try XCTUnwrap(ModelConfigurationStore.load(defaults: defaults))
+
+        XCTAssertEqual(selection.provider, .custom)
+        XCTAssertEqual(selection.customEndpoint, "https://legacy.example.com/v1/chat/completions")
+        XCTAssertEqual(selection.customModel, "legacy-model")
+        XCTAssertEqual(configuration.provider, .custom)
+        XCTAssertEqual(configuration.model, "legacy-model")
     }
 
     func testAnalysisConsentIsScopedToProviderHost() throws {
@@ -476,6 +552,106 @@ final class AIWindowTests: XCTestCase {
         XCTAssertTrue(userMessage.contains("争论焦点是什么？"))
         XCTAssertTrue(userMessage.contains("<forum_content>"))
         XCTAssertTrue(userMessage.contains("这是一段帖子正文。"))
+    }
+
+    func testModelRequestMapsProviderSpecificReasoningFields() throws {
+        let context = try TopicAnalysisContextBuilder.make(
+            title: "示例主题",
+            canonicalURL: URL(string: "https://linux.do/t/example/123")!,
+            candidates: [
+                ForumPostCandidate(order: 1, text: "帖子正文", distanceFromViewport: 0),
+            ]
+        )
+
+        func body(
+            provider: ModelProviderPreset,
+            modelID: String? = nil,
+            reasoningID: String? = nil,
+            customEndpoint: String = "",
+            customModel: String = ""
+        ) throws -> [String: Any] {
+            let configuration = try ModelAPIConfiguration(
+                selection: ModelConfigurationSelection(
+                    provider: provider,
+                    modelID: modelID,
+                    reasoningID: reasoningID,
+                    customEndpoint: customEndpoint,
+                    customModel: customModel
+                )
+            )
+            let request = try ModelAnalysisClient(
+                configuration: configuration,
+                apiKey: "key"
+            ).makeRequest(context: context, question: "总结")
+            return try XCTUnwrap(
+                JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody))
+                    as? [String: Any]
+            )
+        }
+
+        let kimi = try body(provider: .kimi, reasoningID: "max")
+        XCTAssertEqual(kimi["reasoning_effort"] as? String, "max")
+        XCTAssertNil(kimi["thinking"])
+        XCTAssertNil(kimi["max_tokens"])
+        XCTAssertEqual(
+            kimi["max_completion_tokens"] as? Int,
+            ModelAPIConfiguration.maximumGeneratedTokens
+        )
+
+        let kimi26 = try body(
+            provider: .kimi,
+            modelID: "kimi-k2.6",
+            reasoningID: "enabled"
+        )
+        XCTAssertNil(kimi26["reasoning_effort"])
+        XCTAssertEqual((kimi26["thinking"] as? [String: Any])?["type"] as? String, "enabled")
+        XCTAssertEqual(
+            kimi26["max_tokens"] as? Int,
+            ModelAPIConfiguration.maximumGeneratedTokens
+        )
+        XCTAssertNil(kimi26["max_completion_tokens"])
+
+        let deepSeek = try body(provider: .deepSeek, reasoningID: "high")
+        XCTAssertEqual(deepSeek["reasoning_effort"] as? String, "high")
+        XCTAssertEqual(
+            (deepSeek["thinking"] as? [String: Any])?["type"] as? String,
+            "enabled"
+        )
+        XCTAssertEqual(
+            deepSeek["max_tokens"] as? Int,
+            ModelAPIConfiguration.maximumGeneratedTokens
+        )
+
+        let glm = try body(provider: .glm, reasoningID: "max")
+        XCTAssertEqual(glm["reasoning_effort"] as? String, "max")
+        XCTAssertEqual((glm["thinking"] as? [String: Any])?["type"] as? String, "enabled")
+        XCTAssertEqual(
+            glm["max_tokens"] as? Int,
+            ModelAPIConfiguration.maximumGeneratedTokens
+        )
+
+        let openAI = try body(
+            provider: .openAI,
+            modelID: "gpt-5.6-luna",
+            reasoningID: "none"
+        )
+        XCTAssertEqual(openAI["reasoning_effort"] as? String, "none")
+        XCTAssertNil(openAI["thinking"])
+        XCTAssertNil(openAI["max_tokens"])
+        XCTAssertEqual(
+            openAI["max_completion_tokens"] as? Int,
+            ModelAPIConfiguration.maximumGeneratedTokens
+        )
+
+        let custom = try body(
+            provider: .custom,
+            customEndpoint: "https://model.example.com/v1/chat/completions",
+            customModel: "compatible-model"
+        )
+        XCTAssertNil(custom["reasoning_effort"])
+        XCTAssertNil(custom["thinking"])
+        XCTAssertNil(custom["max_tokens"])
+        XCTAssertNil(custom["max_completion_tokens"])
     }
 
     func testModelResponseSupportsTextAndTextParts() throws {

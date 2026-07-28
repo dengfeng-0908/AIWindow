@@ -13,10 +13,11 @@ struct SettingsView: View {
     @State private var showsClearConfirmation = false
     @State private var showsWebsiteDataClearConfirmation = false
     @State private var isClearingWebsiteData = false
-    @State private var modelEndpoint = ""
-    @State private var modelName = ""
+    @State private var modelSelection = ModelConfigurationSelection.defaultSelection
     @State private var apiKeyInput = ""
     @State private var hasStoredAPIKey = false
+    @State private var storedAPIKeyHost: String?
+    @State private var hasStoredModelConfiguration = false
     @State private var statusTitle = ""
     @State private var statusMessage: String?
 
@@ -41,17 +42,43 @@ struct SettingsView: View {
                 }
 
                 Section("AI 分析") {
-                    TextField("完整 API 地址", text: $modelEndpoint)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
+                    Picker("模型服务", selection: modelProviderBinding) {
+                        ForEach(ModelProviderPreset.allCases) { provider in
+                            Text(provider.title).tag(provider)
+                        }
+                    }
 
-                    TextField("模型名称", text: $modelName)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    if modelSelection.provider == .custom {
+                        TextField("完整 HTTPS API 地址", text: $modelSelection.customEndpoint)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+
+                        TextField("模型名称", text: $modelSelection.customModel)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    } else if let model = selectedModel {
+                        Picker("模型", selection: modelPresetBinding) {
+                            ForEach(modelSelection.provider.models) { option in
+                                Text(option.title).tag(option.id)
+                            }
+                        }
+
+                        Picker("推理强度", selection: $modelSelection.reasoningID) {
+                            ForEach(model.reasoningOptions) { option in
+                                Text(option.title).tag(option.id)
+                            }
+                        }
+
+                        if modelSelection.provider == .openAI {
+                            Text("需要 OpenAI Platform API Key；ChatGPT 或 Codex 登录不能代替。")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     SecureField(
-                        hasStoredAPIKey ? "输入新 API Key 以替换" : "API Key",
+                        apiKeyPlaceholder,
                         text: $apiKeyInput
                     )
                     .textInputAutocapitalization(.never)
@@ -61,7 +88,7 @@ struct SettingsView: View {
                         Label("保存模型设置", systemImage: "checkmark.circle")
                     }
 
-                    if hasStoredAPIKey || !modelEndpoint.isEmpty || !modelName.isEmpty {
+                    if hasStoredAPIKey || hasStoredModelConfiguration {
                         Button(role: .destructive, action: clearModelSettings) {
                             Label("清除模型设置", systemImage: "key.slash")
                         }
@@ -149,6 +176,53 @@ struct SettingsView: View {
         )
     }
 
+    private var selectedModel: ModelPreset? {
+        modelSelection.provider.model(id: modelSelection.modelID)
+    }
+
+    private var canReuseStoredAPIKey: Bool {
+        guard hasStoredAPIKey,
+              let storedAPIKeyHost,
+              let configuration = try? ModelAPIConfiguration(selection: modelSelection)
+        else {
+            return false
+        }
+        return configuration.providerHost.lowercased() == storedAPIKeyHost
+    }
+
+    private var apiKeyPlaceholder: String {
+        if canReuseStoredAPIKey {
+            return "输入新 API Key 以替换"
+        }
+        return hasStoredAPIKey ? "输入该服务的 API Key" : "API Key"
+    }
+
+    private var modelProviderBinding: Binding<ModelProviderPreset> {
+        Binding(
+            get: { modelSelection.provider },
+            set: { provider in
+                var updated = modelSelection
+                updated.provider = provider
+                updated.modelID = provider.defaultModelID
+                updated.reasoningID = provider
+                    .model(id: provider.defaultModelID)?
+                    .defaultReasoningID ?? "compatible"
+                modelSelection = updated
+            }
+        )
+    }
+
+    private var modelPresetBinding: Binding<String> {
+        Binding(
+            get: { modelSelection.modelID },
+            set: { modelID in
+                guard let model = modelSelection.provider.model(id: modelID) else { return }
+                modelSelection.modelID = model.id
+                modelSelection.reasoningID = model.defaultReasoningID
+            }
+        )
+    }
+
     private func prepareExport() {
         exportDocument = BackupFileDocument(
             payload: BackupService.makePayload(topics: topics, searches: searches)
@@ -205,11 +279,14 @@ struct SettingsView: View {
     }
 
     private func loadModelSettings() {
-        let values = ModelConfigurationStore.savedValues()
-        modelEndpoint = values.endpoint
-        modelName = values.model
+        modelSelection = ModelConfigurationStore.savedSelection()
+        let configuration = ModelConfigurationStore.load()
+        hasStoredModelConfiguration = configuration != nil
         do {
             hasStoredAPIKey = try apiKeyStore.read() != nil
+            storedAPIKeyHost = hasStoredAPIKey
+                ? configuration?.providerHost.lowercased()
+                : nil
         } catch {
             showStatus(title: "读取失败", message: error.localizedDescription)
         }
@@ -217,12 +294,9 @@ struct SettingsView: View {
 
     private func saveModelSettings() {
         do {
-            _ = try ModelAPIConfiguration(
-                endpointText: modelEndpoint,
-                modelText: modelName
-            )
+            let configuration = try ModelAPIConfiguration(selection: modelSelection)
             let trimmedKey = apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard hasStoredAPIKey || !trimmedKey.isEmpty else {
+            guard canReuseStoredAPIKey || !trimmedKey.isEmpty else {
                 throw ModelAPIKeyStoreError.emptyKey
             }
             if !trimmedKey.isEmpty {
@@ -230,10 +304,9 @@ struct SettingsView: View {
                 hasStoredAPIKey = true
                 apiKeyInput = ""
             }
-            _ = try ModelConfigurationStore.save(
-                endpointText: modelEndpoint,
-                modelText: modelName
-            )
+            _ = try ModelConfigurationStore.save(selection: modelSelection)
+            hasStoredModelConfiguration = true
+            storedAPIKeyHost = configuration.providerHost.lowercased()
             showStatus(title: "已保存", message: "模型设置已保存。")
         } catch {
             showStatus(title: "保存失败", message: error.localizedDescription)
@@ -246,8 +319,9 @@ struct SettingsView: View {
             ModelConfigurationStore.clear()
             ModelAnalysisConsentStore.clear()
             hasStoredAPIKey = false
-            modelEndpoint = ""
-            modelName = ""
+            storedAPIKeyHost = nil
+            hasStoredModelConfiguration = false
+            modelSelection = .defaultSelection
             apiKeyInput = ""
             showStatus(title: "已清除", message: "模型设置已清除。")
         } catch {

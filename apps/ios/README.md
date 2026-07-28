@@ -10,7 +10,8 @@ AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站
 - LINUX DO 官方搜索与主站共享持久登录会话；外部搜索使用临时会话
 - 网页内自行登录、跨重启保持登录，以及设置页清除此 App 的会话
 - LINUX DO 帖子浏览历史、收藏、标签、备注和检索
-- 一键整理当前已加载帖子文字并发送到用户配置的 Chat Completions API
+- Kimi、DeepSeek、GLM、OpenAI 模型预设与自定义 Chat Completions 服务
+- 一键整理当前已加载帖子文字并按所选模型与推理强度发送
 - JSON 导入、导出、格式校验和去重合并
 - 无自建账号、无后端、无广告、无行为统计 SDK；核心浏览功能无需 API Key
 
@@ -35,7 +36,9 @@ AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站
 
 ## 配置帖子分析
 
-在 App 的“设置 → AI 分析”中填写完整的 OpenAI-compatible Chat Completions HTTPS 地址、模型名称和自己的 API Key。项目不预置模型服务或共享密钥；API Key 只存入当前设备的 Keychain，可在同一页面一次清除全部模型设置。
+在 App 的“设置 → AI 分析”中选择 Kimi、DeepSeek、GLM 或 OpenAI GPT-5.6，再选择模型和推理强度，通常只需输入该服务的 API Key。OpenAI 选项需要 OpenAI Platform API Key，ChatGPT 或 Codex 登录不能代替。选择“自定义兼容服务”时，仍可手填完整的 Chat Completions HTTPS 地址和模型名称；自定义请求默认不附加任何厂商特有推理字段。
+
+项目不提供共享密钥。API Key 只存入当前设备的 Keychain，同一服务内切换模型时可以继续使用；切换到不同服务域名时需要输入对应服务的 Key。旧版本已经保存的地址和模型会自动作为自定义配置显示，可在同一页面一次清除全部模型设置。
 
 打开一个 LINUX DO 主题后，点击底部的星光按钮即可自动整理当前已经加载的主帖和附近回复。第一次向某个模型域名发送时会显示目标域名和实际范围；之后不要求手动选择帖子文字。该功能不会自动滚动、加载整帖或分析私信和账号页面。
 
@@ -78,6 +81,6 @@ LINUX DO 页面只由用户主动打开。默认搜索直接进入 `linux.do/sea
 
 App 不读取、记录或导出 Cookie、密码与验证码，也不判断具体账号身份。设置页的“清除此 App 的登录状态”会清空 App 的持久 WebKit 数据，不撤销其他设备的会话，也不影响 Safari。项目不自动登录、签到、发帖、点赞、读取通知，也不对论坛执行爬取、后台监控或批量内容提取。
 
-模型分析只在用户点击后读取当前页面已渲染的帖子正文，并与用户问题一起从 iPhone 直接发送到所配置的模型服务。请求不包含 Cookie、密码、验证码、其他浏览记录或未加载回复，也不经过 AIWindow 后端。模型端点和模型名保存在普通本地设置中；API Key 在 Keychain 中；提示、帖子正文和结果都不进入 SwiftData 或 JSON 备份。
+模型分析只在用户点击后读取当前页面已渲染的帖子正文，并与用户问题一起从 iPhone 直接发送到所配置的模型服务。请求不包含 Cookie、密码、验证码、其他浏览记录或未加载回复，也不经过 AIWindow 后端。服务商、模型、推理强度和自定义端点保存在普通本地设置中；API Key 在 Keychain 中；提示、帖子正文和结果都不进入 SwiftData 或 JSON 备份。
 
 服务条款和第三方权利边界见仓库根目录的 `NOTICE.md`。

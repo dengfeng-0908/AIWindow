@@ -1,11 +1,329 @@
 import Foundation
 import Security
 
+struct ModelReasoningPreset: Identifiable, Equatable, Hashable, Sendable {
+    let id: String
+    let title: String
+    fileprivate let reasoningEffort: String?
+    fileprivate let thinkingType: String?
+}
+
+struct ModelPreset: Identifiable, Equatable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let reasoningOptions: [ModelReasoningPreset]
+    let defaultReasoningID: String
+
+    func reasoningOption(id: String) -> ModelReasoningPreset? {
+        reasoningOptions.first(where: { $0.id == id })
+    }
+}
+
+enum ModelProviderPreset: String, CaseIterable, Identifiable, Sendable {
+    case kimi
+    case deepSeek
+    case glm
+    case openAI
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .kimi: "Kimi"
+        case .deepSeek: "DeepSeek"
+        case .glm: "GLM"
+        case .openAI: "OpenAI GPT-5.6"
+        case .custom: "自定义兼容服务"
+        }
+    }
+
+    var models: [ModelPreset] {
+        switch self {
+        case .kimi:
+            [
+                ModelPreset(
+                    id: "kimi-k3",
+                    title: "Kimi K3",
+                    reasoningOptions: [
+                        .init(
+                            id: "low",
+                            title: "低",
+                            reasoningEffort: "low",
+                            thinkingType: nil
+                        ),
+                        .init(
+                            id: "high",
+                            title: "高",
+                            reasoningEffort: "high",
+                            thinkingType: nil
+                        ),
+                        .init(
+                            id: "max",
+                            title: "最大（默认）",
+                            reasoningEffort: "max",
+                            thinkingType: nil
+                        ),
+                    ],
+                    defaultReasoningID: "max"
+                ),
+                ModelPreset(
+                    id: "kimi-k2.6",
+                    title: "Kimi K2.6",
+                    reasoningOptions: Self.thinkingToggleOptions,
+                    defaultReasoningID: "enabled"
+                ),
+            ]
+        case .deepSeek:
+            [
+                ModelPreset(
+                    id: "deepseek-v4-flash",
+                    title: "DeepSeek V4 Flash",
+                    reasoningOptions: Self.highMaximumReasoningOptions,
+                    defaultReasoningID: "high"
+                ),
+                ModelPreset(
+                    id: "deepseek-v4-pro",
+                    title: "DeepSeek V4 Pro",
+                    reasoningOptions: Self.highMaximumReasoningOptions,
+                    defaultReasoningID: "high"
+                ),
+            ]
+        case .glm:
+            [
+                ModelPreset(
+                    id: "glm-5.2",
+                    title: "GLM-5.2",
+                    reasoningOptions: [
+                        .init(
+                            id: "disabled",
+                            title: "关闭",
+                            reasoningEffort: nil,
+                            thinkingType: "disabled"
+                        ),
+                        .init(
+                            id: "high",
+                            title: "高",
+                            reasoningEffort: "high",
+                            thinkingType: "enabled"
+                        ),
+                        .init(
+                            id: "max",
+                            title: "最大（默认）",
+                            reasoningEffort: "max",
+                            thinkingType: "enabled"
+                        ),
+                    ],
+                    defaultReasoningID: "max"
+                ),
+                ModelPreset(
+                    id: "glm-5.1",
+                    title: "GLM-5.1",
+                    reasoningOptions: Self.thinkingToggleOptions,
+                    defaultReasoningID: "enabled"
+                ),
+            ]
+        case .openAI:
+            [
+                ModelPreset(
+                    id: "gpt-5.6-sol",
+                    title: "GPT-5.6 Sol · 质量优先",
+                    reasoningOptions: Self.openAIReasoningOptions,
+                    defaultReasoningID: "medium"
+                ),
+                ModelPreset(
+                    id: "gpt-5.6-terra",
+                    title: "GPT-5.6 Terra · 均衡",
+                    reasoningOptions: Self.openAIReasoningOptions,
+                    defaultReasoningID: "medium"
+                ),
+                ModelPreset(
+                    id: "gpt-5.6-luna",
+                    title: "GPT-5.6 Luna · 快速",
+                    reasoningOptions: Self.openAIReasoningOptions,
+                    defaultReasoningID: "medium"
+                ),
+            ]
+        case .custom:
+            []
+        }
+    }
+
+    var defaultModelID: String {
+        switch self {
+        case .kimi: "kimi-k3"
+        case .deepSeek: "deepseek-v4-flash"
+        case .glm: "glm-5.2"
+        case .openAI: "gpt-5.6-terra"
+        case .custom: ""
+        }
+    }
+
+    fileprivate var endpointText: String? {
+        switch self {
+        case .kimi:
+            "https://api.moonshot.cn/v1/chat/completions"
+        case .deepSeek:
+            "https://api.deepseek.com/chat/completions"
+        case .glm:
+            "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        case .openAI:
+            "https://api.openai.com/v1/chat/completions"
+        case .custom:
+            nil
+        }
+    }
+
+    func model(id: String) -> ModelPreset? {
+        models.first(where: { $0.id == id })
+    }
+
+    private static let thinkingToggleOptions: [ModelReasoningPreset] = [
+        .init(
+            id: "disabled",
+            title: "关闭",
+            reasoningEffort: nil,
+            thinkingType: "disabled"
+        ),
+        .init(
+            id: "enabled",
+            title: "开启（默认）",
+            reasoningEffort: nil,
+            thinkingType: "enabled"
+        ),
+    ]
+
+    private static let highMaximumReasoningOptions: [ModelReasoningPreset] = [
+        .init(
+            id: "disabled",
+            title: "关闭",
+            reasoningEffort: nil,
+            thinkingType: "disabled"
+        ),
+        .init(
+            id: "high",
+            title: "高（默认）",
+            reasoningEffort: "high",
+            thinkingType: "enabled"
+        ),
+        .init(
+            id: "max",
+            title: "最大",
+            reasoningEffort: "max",
+            thinkingType: "enabled"
+        ),
+    ]
+
+    private static let openAIReasoningOptions: [ModelReasoningPreset] = [
+        .init(id: "none", title: "关闭", reasoningEffort: "none", thinkingType: nil),
+        .init(id: "low", title: "低", reasoningEffort: "low", thinkingType: nil),
+        .init(
+            id: "medium",
+            title: "中（默认）",
+            reasoningEffort: "medium",
+            thinkingType: nil
+        ),
+        .init(id: "high", title: "高", reasoningEffort: "high", thinkingType: nil),
+        .init(id: "xhigh", title: "很高", reasoningEffort: "xhigh", thinkingType: nil),
+        .init(id: "max", title: "最大", reasoningEffort: "max", thinkingType: nil),
+    ]
+}
+
+struct ModelConfigurationSelection: Equatable, Sendable {
+    var provider: ModelProviderPreset
+    var modelID: String
+    var reasoningID: String
+    var customEndpoint: String
+    var customModel: String
+
+    init(
+        provider: ModelProviderPreset,
+        modelID: String? = nil,
+        reasoningID: String? = nil,
+        customEndpoint: String = "",
+        customModel: String = ""
+    ) {
+        self.provider = provider
+        let resolvedModelID = provider.model(id: modelID ?? "")?.id
+            ?? provider.defaultModelID
+        self.modelID = resolvedModelID
+        let model = provider.model(id: resolvedModelID)
+        self.reasoningID = model?.reasoningOption(id: reasoningID ?? "")?.id
+            ?? model?.defaultReasoningID
+            ?? "compatible"
+        self.customEndpoint = customEndpoint
+        self.customModel = customModel
+    }
+
+    static var defaultSelection: ModelConfigurationSelection {
+        ModelConfigurationSelection(provider: .kimi)
+    }
+}
+
+private struct ModelReasoningConfiguration: Equatable, Sendable {
+    let reasoningEffort: String?
+    let thinkingType: String?
+
+    static let compatible = ModelReasoningConfiguration(
+        reasoningEffort: nil,
+        thinkingType: nil
+    )
+}
+
 struct ModelAPIConfiguration: Equatable, Sendable {
+    static let maximumGeneratedTokens = 16_384
+
+    let provider: ModelProviderPreset
     let endpoint: URL
     let model: String
+    fileprivate let reasoning: ModelReasoningConfiguration
 
     init(endpointText: String, modelText: String) throws {
+        try self.init(
+            provider: .custom,
+            endpointText: endpointText,
+            modelText: modelText,
+            reasoning: .compatible
+        )
+    }
+
+    init(selection: ModelConfigurationSelection) throws {
+        if selection.provider == .custom {
+            try self.init(
+                provider: .custom,
+                endpointText: selection.customEndpoint,
+                modelText: selection.customModel,
+                reasoning: .compatible
+            )
+            return
+        }
+
+        guard let endpointText = selection.provider.endpointText,
+              let model = selection.provider.model(id: selection.modelID)
+        else {
+            throw ModelConfigurationError.invalidModel
+        }
+        guard let reasoning = model.reasoningOption(id: selection.reasoningID) else {
+            throw ModelConfigurationError.invalidReasoning
+        }
+
+        try self.init(
+            provider: selection.provider,
+            endpointText: endpointText,
+            modelText: model.id,
+            reasoning: ModelReasoningConfiguration(
+                reasoningEffort: reasoning.reasoningEffort,
+                thinkingType: reasoning.thinkingType
+            )
+        )
+    }
+
+    private init(
+        provider: ModelProviderPreset,
+        endpointText: String,
+        modelText: String,
+        reasoning: ModelReasoningConfiguration
+    ) throws {
         let trimmedEndpoint = endpointText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedModel = modelText.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -28,18 +346,54 @@ struct ModelAPIConfiguration: Equatable, Sendable {
             throw ModelConfigurationError.invalidModel
         }
 
+        self.provider = provider
         self.endpoint = endpoint
         model = trimmedModel
+        self.reasoning = reasoning
     }
 
     var providerHost: String {
         endpoint.host ?? "模型服务"
+    }
+
+    fileprivate var requestTimeoutInterval: TimeInterval {
+        switch reasoning.reasoningEffort {
+        case "max", "xhigh":
+            180
+        case "high", "medium":
+            120
+        default:
+            reasoning.thinkingType == "enabled" ? 120 : 60
+        }
+    }
+
+    fileprivate var maximumTokens: Int? {
+        switch provider {
+        case .deepSeek, .glm:
+            Self.maximumGeneratedTokens
+        case .kimi where model == "kimi-k2.6":
+            Self.maximumGeneratedTokens
+        case .kimi, .openAI, .custom:
+            nil
+        }
+    }
+
+    fileprivate var maximumCompletionTokens: Int? {
+        switch provider {
+        case .kimi where model == "kimi-k3":
+            Self.maximumGeneratedTokens
+        case .openAI:
+            Self.maximumGeneratedTokens
+        case .kimi, .deepSeek, .glm, .custom:
+            nil
+        }
     }
 }
 
 enum ModelConfigurationError: LocalizedError {
     case invalidEndpoint
     case invalidModel
+    case invalidReasoning
 
     var errorDescription: String? {
         switch self {
@@ -47,6 +401,8 @@ enum ModelConfigurationError: LocalizedError {
             "请输入不含账号、查询参数或片段的完整 HTTPS API 地址。"
         case .invalidModel:
             "请输入有效的模型名称。"
+        case .invalidReasoning:
+            "请选择有效的推理强度。"
         }
     }
 }
@@ -54,11 +410,45 @@ enum ModelConfigurationError: LocalizedError {
 enum ModelConfigurationStore {
     private static let endpointKey = "modelAnalysis.endpoint"
     private static let modelKey = "modelAnalysis.model"
+    private static let providerKey = "modelAnalysis.provider"
+    private static let reasoningKey = "modelAnalysis.reasoning"
 
     static func savedValues(defaults: UserDefaults = .standard) -> (endpoint: String, model: String) {
         (
             defaults.string(forKey: endpointKey) ?? "",
             defaults.string(forKey: modelKey) ?? ""
+        )
+    }
+
+    static func savedSelection(
+        defaults: UserDefaults = .standard
+    ) -> ModelConfigurationSelection {
+        let values = savedValues(defaults: defaults)
+        guard let rawProvider = defaults.string(forKey: providerKey),
+              let provider = ModelProviderPreset(rawValue: rawProvider)
+        else {
+            if !values.endpoint.isEmpty || !values.model.isEmpty {
+                return ModelConfigurationSelection(
+                    provider: .custom,
+                    customEndpoint: values.endpoint,
+                    customModel: values.model
+                )
+            }
+            return .defaultSelection
+        }
+
+        if provider == .custom {
+            return ModelConfigurationSelection(
+                provider: .custom,
+                customEndpoint: values.endpoint,
+                customModel: values.model
+            )
+        }
+
+        return ModelConfigurationSelection(
+            provider: provider,
+            modelID: values.model,
+            reasoningID: defaults.string(forKey: reasoningKey)
         )
     }
 
@@ -68,26 +458,40 @@ enum ModelConfigurationStore {
         modelText: String,
         defaults: UserDefaults = .standard
     ) throws -> ModelAPIConfiguration {
-        let configuration = try ModelAPIConfiguration(
-            endpointText: endpointText,
-            modelText: modelText
+        try save(
+            selection: ModelConfigurationSelection(
+                provider: .custom,
+                customEndpoint: endpointText,
+                customModel: modelText
+            ),
+            defaults: defaults
         )
+    }
+
+    @discardableResult
+    static func save(
+        selection: ModelConfigurationSelection,
+        defaults: UserDefaults = .standard
+    ) throws -> ModelAPIConfiguration {
+        let configuration = try ModelAPIConfiguration(selection: selection)
         defaults.set(configuration.endpoint.absoluteString, forKey: endpointKey)
         defaults.set(configuration.model, forKey: modelKey)
+        defaults.set(selection.provider.rawValue, forKey: providerKey)
+        defaults.set(selection.reasoningID, forKey: reasoningKey)
         return configuration
     }
 
     static func load(defaults: UserDefaults = .standard) -> ModelAPIConfiguration? {
         let values = savedValues(defaults: defaults)
-        return try? ModelAPIConfiguration(
-            endpointText: values.endpoint,
-            modelText: values.model
-        )
+        guard !values.endpoint.isEmpty, !values.model.isEmpty else { return nil }
+        return try? ModelAPIConfiguration(selection: savedSelection(defaults: defaults))
     }
 
     static func clear(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: endpointKey)
         defaults.removeObject(forKey: modelKey)
+        defaults.removeObject(forKey: providerKey)
+        defaults.removeObject(forKey: reasoningKey)
     }
 }
 
@@ -422,12 +826,18 @@ struct ModelAnalysisClient {
                 .init(role: "system", content: Self.systemPrompt),
                 .init(role: "user", content: context.userMessage(question: trimmedQuestion)),
             ],
-            stream: false
+            stream: false,
+            reasoningEffort: configuration.reasoning.reasoningEffort,
+            thinking: configuration.reasoning.thinkingType.map {
+                .init(type: $0)
+            },
+            maximumTokens: configuration.maximumTokens,
+            maximumCompletionTokens: configuration.maximumCompletionTokens
         )
 
         var request = URLRequest(url: configuration.endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = 60
+        request.timeoutInterval = configuration.requestTimeoutInterval
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -522,9 +932,27 @@ private struct ChatCompletionPayload: Encodable {
         let content: String
     }
 
+    struct Thinking: Encodable {
+        let type: String
+    }
+
     let model: String
     let messages: [Message]
     let stream: Bool
+    let reasoningEffort: String?
+    let thinking: Thinking?
+    let maximumTokens: Int?
+    let maximumCompletionTokens: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case stream
+        case reasoningEffort = "reasoning_effort"
+        case thinking
+        case maximumTokens = "max_tokens"
+        case maximumCompletionTokens = "max_completion_tokens"
+    }
 }
 
 private struct ChatCompletionResponse: Decodable {

@@ -191,6 +191,6 @@ enum TopicAnalysisSetupError: LocalizedError {
     case missingConfiguration
 
     var errorDescription: String? {
-        "请先在设置中填写模型 API 地址和模型名称。"
+        "请先在设置中选择模型服务并保存 API Key。"
     }
 }
