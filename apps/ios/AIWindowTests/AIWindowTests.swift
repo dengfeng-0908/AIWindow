@@ -232,6 +232,36 @@ final class AIWindowTests: XCTestCase {
         )
     }
 
+    func testLinuxDONetworkFailureExplainsProxySwitchRecovery() {
+        let message = BrowserNavigationErrorPolicy.message(
+            for: URLError(.timedOut),
+            sessionPolicy: .persistentLinuxDO
+        )
+
+        XCTAssertTrue(message?.contains("代理") == true)
+        XCTAssertTrue(message?.contains("App 切换器") == true)
+        XCTAssertTrue(message?.contains("登录状态会保留") == true)
+    }
+
+    func testExternalNetworkFailureDoesNotSuggestRestartingApp() {
+        let message = BrowserNavigationErrorPolicy.message(
+            for: URLError(.timedOut),
+            sessionPolicy: .ephemeralSearch
+        )
+
+        XCTAssertTrue(message?.hasPrefix("页面加载失败：") == true)
+        XCTAssertFalse(message?.contains("App 切换器") == true)
+    }
+
+    func testCancelledBrowserNavigationDoesNotShowAnError() {
+        XCTAssertNil(
+            BrowserNavigationErrorPolicy.message(
+                for: URLError(.cancelled),
+                sessionPolicy: .persistentLinuxDO
+            )
+        )
+    }
+
     func testEphemeralInAppLinksRequireSafeHTTPSURL() {
         XCTAssertTrue(
             TopicURLNormalizer.isSafeEphemeralInAppURL(

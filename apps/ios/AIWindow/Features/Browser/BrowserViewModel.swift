@@ -104,6 +104,39 @@ enum BrowserNavigationResponsePolicy {
     }
 }
 
+enum BrowserNavigationErrorPolicy {
+    private static let networkStateErrorCodes: Set<Int> = [
+        NSURLErrorTimedOut,
+        NSURLErrorCannotFindHost,
+        NSURLErrorCannotConnectToHost,
+        NSURLErrorNetworkConnectionLost,
+        NSURLErrorDNSLookupFailed,
+        NSURLErrorNotConnectedToInternet,
+        NSURLErrorInternationalRoamingOff,
+        NSURLErrorCallIsActive,
+        NSURLErrorDataNotAllowed,
+    ]
+
+    static func message(
+        for error: Error,
+        sessionPolicy: BrowserSessionPolicy
+    ) -> String? {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain,
+           nsError.code == NSURLErrorCancelled {
+            return nil
+        }
+
+        if sessionPolicy == .persistentLinuxDO,
+           nsError.domain == NSURLErrorDomain,
+           networkStateErrorCodes.contains(nsError.code) {
+            return "LINUX DO 页面暂时无法连接。请先检查网络；如果你刚开启或切换代理，请在 App 切换器中结束“AI 视窗”，再重新打开。登录状态会保留。"
+        }
+
+        return "页面加载失败：\(error.localizedDescription)"
+    }
+}
+
 @MainActor
 final class BrowserViewModel: NSObject, ObservableObject {
     @Published private(set) var currentURL: URL?
@@ -459,9 +492,10 @@ extension BrowserViewModel: WKNavigationDelegate {
 
     private func handleNavigationError(_ error: Error) {
         isLoading = false
-        let nsError = error as NSError
-        guard nsError.code != NSURLErrorCancelled else { return }
-        errorMessage = "页面加载失败：\(error.localizedDescription)"
+        errorMessage = BrowserNavigationErrorPolicy.message(
+            for: error,
+            sessionPolicy: sessionPolicy
+        )
         updateNavigationState()
     }
 }
