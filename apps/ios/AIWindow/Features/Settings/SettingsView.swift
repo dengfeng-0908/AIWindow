@@ -27,8 +27,8 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section("本地数据") {
-                    LabeledContent("帖子记录", value: "\(topics.count)")
-                    LabeledContent("搜索记录", value: "\(searches.count)")
+                    LabeledContent("已存帖子数", value: "\(topics.count)")
+                    LabeledContent("已存搜索数", value: "\(searches.count)")
 
                     Button(action: prepareExport) {
                         Label("导出 JSON 备份", systemImage: "square.and.arrow.up")

@@ -137,6 +137,11 @@ enum BrowserNavigationErrorPolicy {
     }
 }
 
+private struct ForumTopicMetadata: Decodable {
+    let title: String
+    let canonicalURL: String
+}
+
 @MainActor
 final class BrowserViewModel: NSObject, ObservableObject {
     @Published private(set) var currentURL: URL?
@@ -161,6 +166,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var urlObservation: NSKeyValueObservation?
     private var titleObservation: NSKeyValueObservation?
     private var observedNavigationTask: Task<Void, Never>?
+    private var titleRefreshTask: Task<Void, Never>?
 
     init(initialURL: URL, modelContext: ModelContext) {
         self.initialURL = initialURL
@@ -186,12 +192,14 @@ final class BrowserViewModel: NSObject, ObservableObject {
         titleObservation = webView.observe(\.title, options: [.new]) { [weak self] _, _ in
             Task { @MainActor [weak self] in
                 self?.updatePageTitle()
+                self?.refreshCurrentTopicTitleIfNeeded()
             }
         }
     }
 
     deinit {
         observedNavigationTask?.cancel()
+        titleRefreshTask?.cancel()
         urlObservation?.invalidate()
         titleObservation?.invalidate()
     }
@@ -338,6 +346,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
                let existing = try TopicRepository.topic(for: canonicalString, in: modelContext) {
                 currentTopic = existing
                 isCurrentTopicFavorite = existing.isFavorite
+                refreshCurrentTopicTitle(for: canonicalURL)
                 return
             }
 
@@ -348,10 +357,99 @@ final class BrowserViewModel: NSObject, ObservableObject {
             )
             lastRecordedCanonicalURL = canonicalString
             isCurrentTopicFavorite = currentTopic?.isFavorite ?? false
+            refreshCurrentTopicTitle(for: canonicalURL)
         } catch {
             errorMessage = "无法保存浏览记录：\(error.localizedDescription)"
         }
     }
+
+    private func refreshCurrentTopicTitleIfNeeded() {
+        guard let url = webView.url,
+              let canonicalURL = TopicURLNormalizer.canonicalTopicURL(from: url) else {
+            return
+        }
+        refreshCurrentTopicTitle(for: canonicalURL)
+    }
+
+    private func refreshCurrentTopicTitle(for canonicalURL: URL) {
+        titleRefreshTask?.cancel()
+        titleRefreshTask = Task { [weak self] in
+            guard let self else { return }
+
+            for delay in [UInt64(0), 400_000_000, 1_200_000_000] {
+                if delay > 0 {
+                    do {
+                        try await Task.sleep(nanoseconds: delay)
+                    } catch {
+                        return
+                    }
+                }
+                guard !Task.isCancelled,
+                      let currentURL = webView.url,
+                      TopicURLNormalizer.canonicalTopicURL(from: currentURL) == canonicalURL else {
+                    return
+                }
+
+                do {
+                    let rawValue = try await webView.evaluateJavaScript(
+                        Self.topicMetadataExtractionScript
+                    )
+                    guard let json = rawValue as? String,
+                          let data = json.data(using: .utf8),
+                          let metadata = try? JSONDecoder().decode(
+                              ForumTopicMetadata.self,
+                              from: data
+                          ),
+                          let metadataURL = URL(string: metadata.canonicalURL),
+                          TopicURLNormalizer.canonicalTopicURL(from: metadataURL) == canonicalURL,
+                          !TopicTitleNormalizer.isFallback(
+                              TopicTitleNormalizer.normalized(
+                                  metadata.title,
+                                  fallbackURL: canonicalURL
+                              ),
+                              for: canonicalURL
+                          ),
+                          let topic = try TopicRepository.topic(
+                              for: canonicalURL.absoluteString,
+                              in: modelContext
+                          ) else {
+                        continue
+                    }
+
+                    try TopicRepository.updateTitle(
+                        metadata.title,
+                        for: topic,
+                        in: modelContext
+                    )
+                    currentTopic = topic
+                    pageTitle = topic.displayTitle
+                    return
+                } catch {
+                    continue
+                }
+            }
+        }
+    }
+
+    private static let topicMetadataExtractionScript = #"""
+    (() => {
+        const normalize = (value) => String(value || "")
+            .replace(/\u00a0/g, " ")
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n{2,}/g, " ")
+            .trim();
+        const canonicalNode = document.querySelector("link[rel='canonical']");
+        const titleNode = document.querySelector(
+            "h1#topic-title, #topic-title h1, .fancy-title, .topic-title h1"
+        );
+        const metadataTitle = document.querySelector("meta[property='og:title']")
+            ?.getAttribute("content");
+        return JSON.stringify({
+            title: normalize(titleNode ? titleNode.innerText : metadataTitle).slice(0, 500),
+            canonicalURL: canonicalNode ? canonicalNode.href : ""
+        });
+    })();
+    """#
 
     private static let topicExtractionScript = #"""
     (() => {
@@ -381,9 +479,13 @@ final class BrowserViewModel: NSObject, ObservableObject {
                 distanceFromViewport: Math.abs(rect.top + rect.height / 2 - viewportCenter)
             };
         }).filter((post) => post.text.length > 0);
-        const titleNode = document.querySelector("#topic-title h1, .fancy-title, h1");
+        const titleNode = document.querySelector(
+            "h1#topic-title, #topic-title h1, .fancy-title, .topic-title h1"
+        );
+        const metadataTitle = document.querySelector("meta[property='og:title']")
+            ?.getAttribute("content");
         return JSON.stringify({
-            title: normalize(titleNode ? titleNode.innerText : document.title).slice(0, 500),
+            title: normalize(titleNode ? titleNode.innerText : metadataTitle).slice(0, 500),
             posts
         });
     })();

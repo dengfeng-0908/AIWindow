@@ -11,7 +11,7 @@ AI 视窗（工程名 `AIWindow`）是一款面向 iPhone 的开源 AI 资讯与
 - AI HOT 精选、热点和最新日报，支持时间窗口、分类、搜索、刷新和 cursor 分页
 - 资讯详情中的 AI HOT 署名、canonical 入口、第三方原文入口和系统分享
 - App 内原样打开 LINUX DO 官方搜索页；Bing / Google 作为临时会话备用入口
-- LINUX DO 浏览历史、收藏、标签、备注和 JSON 备份恢复，数据保存在本机
+- LINUX DO 浏览历史、收藏、标签、备注和 JSON 备份恢复，数据保存在本机；异常旧标题会先显示帖子编号，并在用户重新打开该帖子时校正
 - LINUX DO 登录状态在 App 沙盒中保持，并可在设置中清除此 App 的会话
 - Kimi、DeepSeek、GLM、OpenAI 模型预设与自定义兼容服务，一键分析当前已加载的帖子文字
 - 无自建账号、无广告、无行为统计 SDK、无项目后端；资讯和浏览功能不需要 API Key

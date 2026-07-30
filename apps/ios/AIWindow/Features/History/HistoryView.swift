@@ -15,7 +15,7 @@ struct HistoryView: View {
             guard topic.hasHistory else { return false }
             let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !needle.isEmpty else { return true }
-            return topic.title.localizedCaseInsensitiveContains(needle)
+            return topic.displayTitle.localizedCaseInsensitiveContains(needle)
                 || topic.canonicalURL.localizedCaseInsensitiveContains(needle)
         }
     }

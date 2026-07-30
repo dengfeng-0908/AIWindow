@@ -46,6 +46,11 @@ final class TopicRecord {
         return TopicURLNormalizer.canonicalTopicURL(from: storedURL)
     }
 
+    var displayTitle: String {
+        guard let url else { return title }
+        return TopicTitleNormalizer.normalized(title, fallbackURL: url)
+    }
+
     var tags: [String] {
         get {
             tagsStorage

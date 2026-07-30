@@ -736,6 +736,55 @@ final class AIWindowTests: XCTestCase {
         XCTAssertEqual(topics[0].title, "Example")
     }
 
+    func testTopicTitleNormalizerRejectsStaleSearchAndURLTitles() {
+        let url = URL(string: "https://linux.do/t/topic/1969598")!
+
+        XCTAssertEqual(
+            TopicTitleNormalizer.normalized(nil, fallbackURL: url),
+            "LINUX DO 帖子 #1969598"
+        )
+        XCTAssertEqual(
+            TopicTitleNormalizer.normalized(url.absoluteString, fallbackURL: url),
+            "LINUX DO 帖子 #1969598"
+        )
+        XCTAssertEqual(
+            TopicTitleNormalizer.normalized("'科研' 的搜索结果", fallbackURL: url),
+            "LINUX DO 帖子 #1969598"
+        )
+        XCTAssertEqual(
+            TopicTitleNormalizer.normalized("(3) 示例主题 - LINUX DO", fallbackURL: url),
+            "示例主题"
+        )
+    }
+
+    func testWeakTopicTitleDoesNotReplaceUsefulStoredTitle() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let url = URL(string: "https://linux.do/t/example/9876")!
+
+        try TopicRepository.recordVisit(url: url, title: "正确标题", in: context)
+        try TopicRepository.recordVisit(url: url, title: "'科研' 的搜索结果", in: context)
+
+        let topic = try XCTUnwrap(context.fetch(FetchDescriptor<TopicRecord>()).first)
+        XCTAssertEqual(topic.title, "正确标题")
+    }
+
+    func testVerifiedTopicTitleReplacesFallback() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let url = URL(string: "https://linux.do/t/topic/1969598")!
+        let topic = try XCTUnwrap(
+            TopicRepository.recordVisit(url: url, title: nil, in: context)
+        )
+
+        XCTAssertEqual(topic.displayTitle, "LINUX DO 帖子 #1969598")
+
+        try TopicRepository.updateTitle("真实帖子标题", for: topic, in: context)
+
+        XCTAssertEqual(topic.title, "真实帖子标题")
+        XCTAssertEqual(topic.displayTitle, "真实帖子标题")
+    }
+
     func testRemovingFavoriteHistoryPreservesFavorite() throws {
         let container = try makeContainer()
         let context = container.mainContext

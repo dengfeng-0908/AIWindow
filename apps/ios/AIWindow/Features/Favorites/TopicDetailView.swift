@@ -19,7 +19,7 @@ struct TopicDetailView: View {
     var body: some View {
         Form {
             Section("帖子") {
-                Text(topic.title)
+                Text(topic.displayTitle)
                     .font(.headline)
 
                 Text(topic.canonicalURL)

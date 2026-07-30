@@ -6,7 +6,7 @@ struct TopicRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(topic.title)
+            Text(topic.displayTitle)
                 .font(.body.weight(.medium))
                 .lineLimit(2)
 
