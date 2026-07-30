@@ -51,6 +51,7 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("历史")
+            .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "搜索标题或链接")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

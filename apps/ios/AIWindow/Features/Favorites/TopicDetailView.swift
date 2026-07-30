@@ -51,7 +51,10 @@ struct TopicDetailView: View {
                     NavigationLink {
                         BrowserView(initialURL: url)
                     } label: {
-                        Label("在 App 内打开", systemImage: "doc.text.magnifyingglass")
+                        Label(
+                            topic.needsTitleRefresh ? "打开帖子并恢复标题" : "在 App 内打开",
+                            systemImage: "doc.text.magnifyingglass"
+                        )
                     }
 
                     Button {

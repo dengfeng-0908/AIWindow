@@ -51,6 +51,11 @@ final class TopicRecord {
         return TopicTitleNormalizer.normalized(title, fallbackURL: url)
     }
 
+    var needsTitleRefresh: Bool {
+        guard let url else { return false }
+        return TopicTitleNormalizer.isFallback(displayTitle, for: url)
+    }
+
     var tags: [String] {
         get {
             tagsStorage

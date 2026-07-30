@@ -32,16 +32,23 @@ struct FavoritesView: View {
                 } else {
                     List {
                         ForEach(favorites) { topic in
-                            NavigationLink {
-                                TopicDetailView(topic: topic)
-                            } label: {
-                                TopicRow(topic: topic)
-                            }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    removeFavorite(topic)
+                            if topic.needsTitleRefresh, let url = topic.url {
+                                NavigationLink {
+                                    BrowserView(initialURL: url)
                                 } label: {
-                                    Label("取消收藏", systemImage: "star.slash")
+                                    TopicRow(topic: topic)
+                                }
+                                .swipeActions(edge: .trailing) {
+                                    removeFavoriteButton(for: topic)
+                                }
+                            } else {
+                                NavigationLink {
+                                    TopicDetailView(topic: topic)
+                                } label: {
+                                    TopicRow(topic: topic)
+                                }
+                                .swipeActions(edge: .trailing) {
+                                    removeFavoriteButton(for: topic)
                                 }
                             }
                         }
@@ -71,6 +78,14 @@ struct FavoritesView: View {
             try TopicRepository.setFavorite(false, for: topic, in: modelContext)
         } catch {
             errorMessage = "无法取消收藏：\(error.localizedDescription)"
+        }
+    }
+
+    private func removeFavoriteButton(for topic: TopicRecord) -> some View {
+        Button(role: .destructive) {
+            removeFavorite(topic)
+        } label: {
+            Label("取消收藏", systemImage: "star.slash")
         }
     }
 }

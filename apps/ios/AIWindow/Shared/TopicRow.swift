@@ -20,6 +20,12 @@ struct TopicRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            if topic.needsTitleRefresh {
+                Label("打开帖子后自动恢复标题", systemImage: "arrow.clockwise")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if !topic.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {

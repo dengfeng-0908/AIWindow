@@ -24,9 +24,15 @@ struct AIHotView: View {
 
                 Divider()
 
+                if viewModel.section == .selected {
+                    AIHotFilterBar(viewModel: viewModel)
+                    Divider()
+                }
+
                 content
             }
             .navigationTitle("资讯")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: AIHotItem.self) { item in
                 AIHotItemDetailView(item: item)
             }
@@ -38,13 +44,6 @@ struct AIHotView: View {
             }
             .navigationDestination(for: AIHotDailyFlash.self) { flash in
                 AIHotDailyFlashDetailView(flash: flash)
-            }
-            .toolbar {
-                if viewModel.section == .selected {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        AIHotFilterMenu(viewModel: viewModel)
-                    }
-                }
             }
             .onChange(of: viewModel.category) { _, _ in
                 Task { await viewModel.reloadItems() }
@@ -92,28 +91,40 @@ struct AIHotView: View {
     }
 }
 
-private struct AIHotFilterMenu: View {
+private struct AIHotFilterBar: View {
     @ObservedObject var viewModel: AIHotViewModel
 
     var body: some View {
-        Menu {
-            Picker("时间范围", selection: $viewModel.window) {
-                ForEach(AIHotWindow.allCases) { window in
-                    Text(window.displayName).tag(window)
+        HStack(spacing: 10) {
+            Menu {
+                Picker("时间范围", selection: $viewModel.window) {
+                    ForEach(AIHotWindow.allCases) { window in
+                        Text(window.displayName).tag(window)
+                    }
                 }
+            } label: {
+                Label(viewModel.window.displayName, systemImage: "calendar")
             }
 
-            Picker("分类", selection: $viewModel.category) {
-                ForEach(AIHotCategory.allCases) { category in
-                    Label(category.displayName, systemImage: category.systemImage)
-                        .tag(category)
+            Menu {
+                Picker("分类", selection: $viewModel.category) {
+                    ForEach(AIHotCategory.allCases) { category in
+                        Label(category.displayName, systemImage: category.systemImage)
+                            .tag(category)
+                    }
                 }
+            } label: {
+                Label(viewModel.category.displayName, systemImage: viewModel.category.systemImage)
             }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+
+            Spacer(minLength: 0)
         }
-        .accessibilityLabel("筛选资讯")
-        .help("筛选资讯")
+        .font(.subheadline.weight(.medium))
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.background)
     }
 }
 
@@ -150,14 +161,10 @@ private struct AIHotItemsView: View {
                         }
                     }
 
-                    Section {
-                        ForEach(viewModel.items) { item in
-                            NavigationLink(value: item) {
-                                AIHotItemRow(item: item)
-                            }
+                    ForEach(viewModel.items) { item in
+                        NavigationLink(value: item) {
+                            AIHotItemRow(item: item)
                         }
-                    } header: {
-                        Text(filterSummary)
                     }
 
                     if viewModel.hasMoreItems {
@@ -190,14 +197,6 @@ private struct AIHotItemsView: View {
         .refreshable {
             await viewModel.reloadItems()
         }
-    }
-
-    private var filterSummary: String {
-        var values = [viewModel.window.displayName, viewModel.category.displayName]
-        if let search = viewModel.submittedSearchText {
-            values.append("“\(search)”")
-        }
-        return values.joined(separator: " · ")
     }
 
     private var emptyDescription: String {

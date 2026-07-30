@@ -376,7 +376,13 @@ final class BrowserViewModel: NSObject, ObservableObject {
         titleRefreshTask = Task { [weak self] in
             guard let self else { return }
 
-            for delay in [UInt64(0), 400_000_000, 1_200_000_000] {
+            for delay in [
+                UInt64(0),
+                400_000_000,
+                1_200_000_000,
+                2_400_000_000,
+                4_000_000_000
+            ] {
                 if delay > 0 {
                     do {
                         try await Task.sleep(nanoseconds: delay)

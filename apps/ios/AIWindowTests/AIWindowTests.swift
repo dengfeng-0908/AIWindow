@@ -778,11 +778,13 @@ final class AIWindowTests: XCTestCase {
         )
 
         XCTAssertEqual(topic.displayTitle, "LINUX DO 帖子 #1969598")
+        XCTAssertTrue(topic.needsTitleRefresh)
 
         try TopicRepository.updateTitle("真实帖子标题", for: topic, in: context)
 
         XCTAssertEqual(topic.title, "真实帖子标题")
         XCTAssertEqual(topic.displayTitle, "真实帖子标题")
+        XCTAssertFalse(topic.needsTitleRefresh)
     }
 
     func testRemovingFavoriteHistoryPreservesFavorite() throws {
