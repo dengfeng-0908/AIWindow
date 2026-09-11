@@ -34,6 +34,24 @@ AI 视窗是 iOS 17+ 的 SwiftUI App，提供 AI HOT 公开资讯、LINUX DO 站
 
 个人团队签名可能存在有效期限制，具体以当前 Xcode 和 Apple Account 提示为准。
 
+## 通过数据线或 Wi-Fi 快速重装
+
+第一次真机安装仍需在 Xcode 中完成 Apple Account 登录、设备配对和系统信任。之后可以不打开工程，直接从仓库根目录运行：
+
+```sh
+./scripts/install_on_connected_iphone.sh --dry-run
+./scripts/install_on_connected_iphone.sh
+```
+
+脚本会使用 Xcode 已登录账号的 Personal Team 进行一次性签名，并构建、安装、启动 App；不会把 Team、证书、描述文件或设备标识符写进工程。它会自动选择唯一一台可用 iPhone；多设备时先列出设备，再明确指定目标：
+
+```sh
+./scripts/install_on_connected_iphone.sh --list-devices
+./scripts/install_on_connected_iphone.sh --device <identifier>
+```
+
+无线重装不依赖 Finder 中出现 iPhone。首次以数据线配对后，在 Xcode 的 `Window → Devices and Simulators` 中确认设备可用；拔线后，只要 Mac 和 iPhone 位于同一局域网、设备仍显示为可用，脚本会通过 Xcode 的无线连接部署。若设备显示为 `unavailable`，请先解锁 iPhone、确认同一 Wi-Fi，必要时短暂接线以恢复配对。
+
 ## 配置帖子分析
 
 在 App 的“设置 → AI 分析”中选择 Kimi、DeepSeek、GLM 或 OpenAI GPT-5.6，再选择模型和推理强度，通常只需输入该服务的 API Key。OpenAI 选项需要 OpenAI Platform API Key，ChatGPT 或 Codex 登录不能代替。选择“自定义兼容服务”时，仍可手填完整的 Chat Completions HTTPS 地址和模型名称；自定义请求默认不附加任何厂商特有推理字段。
@@ -75,7 +93,7 @@ SwiftData 数据库存放在 App 沙盒中。导出的 JSON 包含帖子链接�
 
 设置页中的“已存帖子数”和“已存搜索数”只是本地数据统计；查看、搜索和删除浏览记录统一从底部“历史”进入。标题校正只发生在用户当前打开的帖子页面；收藏列表中的编号占位项会直接打开对应帖子并自动校正，不会为了补全旧记录而后台访问其他帖子。
 
-AI HOT 通过 `https://aihot.virxact.com/api/v1` 匿名读取，不发送账号、Cookie、设备标识符或 API Key。响应只缓存在运行内存中；相同完整 URL 在 60 秒内不会重复请求，过期后使用条件请求，并遵守服务端 `Retry-After`。
+AI HOT 通过 `https://aihot.news/api/v1` 匿名读取（规范域名已由 `aihot.virxact.com` 迁移至 `aihot.news`，链接校验在迁移期同时放行两个域），不发送账号、Cookie、设备标识符或 API Key。响应只缓存在运行内存中；相同完整 URL 在 60 秒内不会重复请求，过期后使用条件请求，并遵守服务端 `Retry-After`。
 
 LINUX DO 页面只由用户主动打开。默认搜索直接进入 `linux.do/search` 官方网页，保留站点自己的结果样式、排序和筛选，并与其他 `linux.do` 顶层页面共用 App 沙盒中的持久 WebKit 数据存储。App 不抓取、解析或重分发搜索结果，也不调用或模拟论坛 API。Bing 和 Google 仅作为备用入口，其结果页使用临时数据存储；从备用结果进入主站时会自动切换到持久会话。第三方 HTTPS 链接在独立的临时 App 内网页中打开，不接触 LINUX DO 的登录会话。
 

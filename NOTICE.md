@@ -12,7 +12,7 @@ AIWindow is an unofficial, independent client. It is not affiliated with,
 sponsored by, endorsed by, or operated in partnership with AI HOT or LINUX DO.
 Use of either service remains subject to its current terms:
 
-- AI HOT public access terms: <https://aihot.virxact.com/terms>
+- AI HOT public access terms: <https://aihot.news/terms>
 - LINUX DO terms of service: <https://linux.do/tos>
 
 Any model endpoint configured by a user is also an independent third-party

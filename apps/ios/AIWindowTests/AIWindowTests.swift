@@ -897,7 +897,7 @@ final class AIWindowTests: XCTestCase {
                   "summary": "中文摘要",
                   "source": { "name": "Example News" },
                   "links": {
-                    "aihot": "https://aihot.virxact.com/items/item-1",
+                    "aihot": "https://aihot.news/items/item-1",
                     "original": "https://example.com/news/item-1"
                   },
                   "publishedAt": "2026-07-25T01:08:45.000Z",
@@ -907,7 +907,7 @@ final class AIWindowTests: XCTestCase {
                   "selected": true,
                   "attribution": {
                     "name": "AI HOT",
-                    "url": "https://aihot.virxact.com/items/item-1"
+                    "url": "https://aihot.news/items/item-1"
                   }
                 }
               ],
@@ -930,7 +930,7 @@ final class AIWindowTests: XCTestCase {
 
     func testAIHotLinksRejectNonWebOriginalURL() {
         let data = Data(
-            #"{"aihot":"https://aihot.virxact.com/items/1","original":"javascript:alert(1)"}"#.utf8
+            #"{"aihot":"https://aihot.news/items/1","original":"javascript:alert(1)"}"#.utf8
         )
 
         XCTAssertThrowsError(
@@ -940,7 +940,7 @@ final class AIWindowTests: XCTestCase {
 
     func testAIHotAttributionRejectsLookalikeHost() {
         let data = Data(
-            #"{"name":"AI HOT","url":"https://aihot.virxact.com.example.com/items/1"}"#.utf8
+            #"{"name":"AI HOT","url":"https://aihot.news.example.com/items/1"}"#.utf8
         )
 
         XCTAssertThrowsError(
@@ -950,12 +950,22 @@ final class AIWindowTests: XCTestCase {
 
     func testAIHotAttributionRejectsNonstandardPort() {
         let data = Data(
-            #"{"name":"AI HOT","url":"https://aihot.virxact.com:444/items/1"}"#.utf8
+            #"{"name":"AI HOT","url":"https://aihot.news:444/items/1"}"#.utf8
         )
 
         XCTAssertThrowsError(
             try AIHotJSON.decoder().decode(AIHotAttribution.self, from: data)
         )
+    }
+
+    func testAIHotLinksAcceptLegacyCanonicalDomainDuringMigration() throws {
+        let data = Data(
+            #"{"aihot":"https://aihot.virxact.com/items/1","original":"https://example.com/a"}"#.utf8
+        )
+
+        let links = try AIHotJSON.decoder().decode(AIHotContentLinks.self, from: data)
+
+        XCTAssertEqual(links.aihot?.host, "aihot.virxact.com")
     }
 
     func testAIHotItemsRequestUsesV1FiltersAndOpaqueCursor() throws {
@@ -1182,10 +1192,10 @@ final class AIWindowTests: XCTestCase {
                 "generatedAt": "2026-07-25T00:01:00Z",
                 "windowStart": "2026-07-24T00:00:00Z",
                 "windowEnd": "2026-07-25T00:00:00Z",
-                "links": { "aihot": "https://aihot.virxact.com/daily/2026-07-25" },
+                "links": { "aihot": "https://aihot.news/daily/2026-07-25" },
                 "attribution": {
                   "name": "AI HOT",
-                  "url": "https://aihot.virxact.com/daily/2026-07-25"
+                  "url": "https://aihot.news/daily/2026-07-25"
                 },
                 "lead": null,
                 "sections": [
@@ -1297,7 +1307,7 @@ final class AIWindowTests: XCTestCase {
             summary: "摘要",
             source: AIHotSource(name: "Test Source"),
             links: AIHotContentLinks(
-                aihot: URL(string: "https://aihot.virxact.com/items/\(id)")!,
+                aihot: URL(string: "https://aihot.news/items/\(id)")!,
                 original: URL(string: "https://example.com/\(id)")!
             ),
             publishedAt: nil,

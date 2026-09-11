@@ -25,7 +25,7 @@ LINUX DO：iPhone App -> 用户驱动的持久主站 WKWebView（含官方搜索
 - cursor 按不透明字符串处理；未知可选字段和未知分类不会破坏已有功能。
 - 当前不持久化 AI HOT 响应，也不公开镜像或批量再分发数据。
 
-这些约束实现 [AI HOT 公开接入条款](https://aihot.virxact.com/terms) 和[接入页](https://aihot.virxact.com/agent)所要求的来源、缓存与调用频率边界。
+这些约束实现 [AI HOT 公开接入条款](https://aihot.news/terms) 和[接入页](https://aihot.news/agent)所要求的来源、缓存与调用频率边界。
 
 ### LINUX DO
 

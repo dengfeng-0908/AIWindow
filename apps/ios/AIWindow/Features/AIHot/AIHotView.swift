@@ -485,7 +485,7 @@ private struct AIHotInlineError: View {
 }
 
 private struct AIHotAttributionSection: View {
-    private let url = URL(string: "https://aihot.virxact.com")!
+    private let url = URL(string: "https://aihot.news")!
 
     var body: some View {
         Section {

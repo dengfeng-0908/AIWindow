@@ -12,6 +12,7 @@ struct BrowserView: View {
 }
 
 private struct BrowserScreen: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: BrowserViewModel
 
     init(initialURL: URL, modelContext: ModelContext) {
@@ -34,6 +35,7 @@ private struct BrowserScreen: View {
             }
             .navigationTitle(viewModel.pageTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .tabBar)
             .navigationDestination(isPresented: inAppNavigationBinding) {
                 if let url = viewModel.pendingInAppURL {
@@ -51,6 +53,12 @@ private struct BrowserScreen: View {
                 viewModel.reloadAfterWebsiteDataClear()
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: dismiss.callAsFunction) {
+                        Label("返回", systemImage: "chevron.backward")
+                    }
+                }
+
                 ToolbarItemGroup(placement: .bottomBar) {
                     Button(action: viewModel.goBack) {
                         Image(systemName: "chevron.backward")

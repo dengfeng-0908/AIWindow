@@ -303,6 +303,8 @@ private enum AIHotURLPolicy {
               ) else {
             return false
         }
-        return host == "aihot.virxact.com" && url.user == nil && url.password == nil
+        // aihot.news 是现行的规范域名；旧域名 virxact.com 在服务端迁移期仍出现在部分链接里
+        return ["aihot.news", "aihot.virxact.com"].contains(host)
+            && url.user == nil && url.password == nil
     }
 }

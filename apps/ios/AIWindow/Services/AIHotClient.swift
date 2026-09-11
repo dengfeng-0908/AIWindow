@@ -12,7 +12,7 @@ protocol AIHotServing {
 }
 
 struct AIHotClient: AIHotServing {
-    static let productionBaseURL = URL(string: "https://aihot.virxact.com")!
+    static let productionBaseURL = URL(string: "https://aihot.news")!
 
     private let baseURL: URL
     private let session: URLSession
